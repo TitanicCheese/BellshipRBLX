@@ -91,10 +91,11 @@ end
 -- numbers down the camera's left side (see Config.gridOrigin).
 local function sheet(side: number, cf: CFrame, parent: Instance)
 	local top = Config.TABLE_TOP
-	local x0 = Config.SHEET_X[side] -- sheet centre; it spans x0-3.5..x0+3.5 and z -5.5..5.5
+	local x0 = Config.SHEET_X[side] -- sheet centre
+	local s = Config.BOARD_SCALE -- the layout below is in 2-stud squares, scaled by s
 	local paper = block(
 		"Sheet",
-		Vector3.new(7, 0.04, 11),
+		Vector3.new(7 * s, 0.04, 11 * s),
 		cf * CFrame.new(x0, top + 0.02, 0),
 		PAPER,
 		Enum.Material.SmoothPlastic,
@@ -106,8 +107,8 @@ local function sheet(side: number, cf: CFrame, parent: Instance)
 		decal(
 			block(
 				"Line",
-				Vector3.new(0.05, 0.01, 11),
-				cf * CFrame.new(x0 + x, y, 0),
+				Vector3.new(0.05, 0.01, 11 * s),
+				cf * CFrame.new(x0 + x * s, y, 0),
 				LINE,
 				Enum.Material.SmoothPlastic,
 				parent
@@ -119,8 +120,8 @@ local function sheet(side: number, cf: CFrame, parent: Instance)
 		decal(
 			block(
 				"Line",
-				Vector3.new(7, 0.01, 0.05),
-				cf * CFrame.new(x0, y, z),
+				Vector3.new(7 * s, 0.01, 0.05),
+				cf * CFrame.new(x0, y, z * s),
 				LINE,
 				Enum.Material.SmoothPlastic,
 				parent
@@ -128,7 +129,7 @@ local function sheet(side: number, cf: CFrame, parent: Instance)
 			parent
 		)
 	end
-	local _, gui = topCanvas("Labels", Vector2.new(7, 11), cf * CFrame.new(x0, top + 0.06, 0), parent)
+	local _, gui = topCanvas("Labels", Vector2.new(7 * s, 11 * s), cf * CFrame.new(x0, top + 0.06, 0), parent)
 	local ink = Color3.fromRGB(30, 30, 34)
 	for col = 1, Config.COLUMNS do
 		-- Column centres sit at 2, 4, 6 studs from the sheet's left edge, as the camera sees it.
@@ -150,16 +151,16 @@ local function divider(cf: CFrame, parent: Instance)
 	local top = Config.TABLE_TOP
 	local board = block(
 		"Divider",
-		Vector3.new(1.4, 5.5, 6),
-		cf * CFrame.new(0, top + 2.75, 1.5),
+		Vector3.new(1, 4, 4.2),
+		cf * CFrame.new(0, top + 2, 1),
 		Color3.fromRGB(122, 74, 150),
 		Enum.Material.SmoothPlastic,
 		parent
 	)
 	block(
 		"Trim",
-		Vector3.new(1.5, 0.35, 6.1),
-		cf * CFrame.new(0, top + 5.6, 1.5),
+		Vector3.new(1.1, 0.3, 4.3),
+		cf * CFrame.new(0, top + 4.1, 1),
 		Color3.fromRGB(230, 200, 120),
 		Enum.Material.SmoothPlastic,
 		parent
@@ -186,13 +187,13 @@ local function divider(cf: CFrame, parent: Instance)
 	end
 end
 
--- A dark wooden table, 20 x 13 studs: a thick top over an apron, on tapered square legs.
+-- A dark wooden table (Config.TABLE_SIZE): a thick top over an apron, on tapered square legs.
 local function woodenTable(cf: CFrame, parent: Instance)
 	local model = Instance.new("Model")
 	model.Name = "WoodenTable"
 	local top = Config.TABLE_TOP
 	local wood = Color3.fromRGB(62, 36, 24)
-	local w, d = 20, 13
+	local w, d = Config.TABLE_SIZE.X, Config.TABLE_SIZE.Y
 	block(
 		"Top",
 		Vector3.new(w, 0.5, d),
@@ -201,7 +202,7 @@ local function woodenTable(cf: CFrame, parent: Instance)
 		Enum.Material.Wood,
 		model
 	)
-	local inset = 0.5
+	local inset = 0.35
 	local apronY = top - 0.5 - 0.35
 	block(
 		"Apron",
@@ -240,10 +241,10 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	local sections = 4
 	for _, x in { -1, 1 } do
 		for _, z in { -1, 1 } do
-			local lx, lz = x * (w / 2 - inset - 0.3), z * (d / 2 - inset - 0.3)
+			local lx, lz = x * (w / 2 - inset - 0.2), z * (d / 2 - inset - 0.2)
 			for i = 1, sections do
 				local t = (i - 0.5) / sections -- 0 at the top, 1 at the floor
-				local width = 0.8 - 0.35 * t
+				local width = 0.6 - 0.25 * t
 				local h = legHeight / sections
 				block(
 					"Leg",
@@ -259,92 +260,139 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	model.Parent = parent
 end
 
--- A dark wooden dining chair with a spindle back. Built facing -Z with its back at +Z.
+-- A square stick running from point a to point b (both in world space).
+local function beam(
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	width: number,
+	depth: number,
+	color: Color3,
+	parent: Instance
+): Part
+	local p = block(
+		name,
+		Vector3.new(width, depth, (b - a).Magnitude),
+		CFrame.lookAt((a + b) / 2, b),
+		color,
+		Enum.Material.Wood,
+		parent
+	)
+	return p
+end
+
+-- A dark wooden dining chair: tapered legs with stretchers, a seat with a rounded front edge,
+-- and a back that leans back, with a curved crest rail over a row of spindles.
+-- Built facing -Z with its back at +Z.
 local function chair(side: number, cf: CFrame, parent: Instance): Seat
 	local model = Instance.new("Model")
 	model.Name = "Chair" .. side
 	local frame = Color3.fromRGB(78, 42, 24)
 	local seatWood = Color3.fromRGB(122, 64, 34)
-	local base = cf * CFrame.new(Config.SHEET_X[side], 0, 8.3) -- floor point under the seat centre
+	local base = cf * CFrame.new(Config.SHEET_X[side], 0, Config.CHAIR_Z) -- floor under the seat centre
 	local seatTop = 2.2
-	local w, d = 2.4, 2.3 -- seat width and depth
+	local w, d = 2.3, 2.2 -- seat width and depth
+	local function at(x: number, y: number, z: number): Vector3
+		return base:PointToWorldSpace(Vector3.new(x, y, z))
+	end
 
 	local seat = Instance.new("Seat")
 	seat.Name = "Seat" .. side
 	seat.Anchored = true
-	seat.Size = Vector3.new(w, 0.25, d)
-	seat.CFrame = base * CFrame.new(0, seatTop - 0.125, 0)
+	seat.Size = Vector3.new(w, 0.22, d - 0.2)
+	seat.CFrame = base * CFrame.new(0, seatTop - 0.11, 0.1)
 	seat.Color = seatWood
 	seat.Material = Enum.Material.Wood
 	seat.TopSurface = Enum.SurfaceType.Smooth
 	seat.BottomSurface = Enum.SurfaceType.Smooth
 	seat.Parent = model
+	-- Rounded front edge: a cylinder along the seat front.
+	local nose = block(
+		"SeatEdge",
+		Vector3.new(w, 0.22, 0.22),
+		base * CFrame.new(0, seatTop - 0.11, -d / 2 + 0.1),
+		seatWood,
+		Enum.Material.Wood,
+		model
+	)
+	nose.Shape = Enum.PartType.Cylinder
 
-	local leg = 0.24
-	local lx, lz = w / 2 - leg / 2, d / 2 - leg / 2
-	-- Front legs stop under the seat; back legs carry on up as the back posts.
-	for _, x in { -lx, lx } do
-		block(
-			"Leg",
-			Vector3.new(leg, seatTop - 0.25, leg),
-			base * CFrame.new(x, (seatTop - 0.25) / 2, -lz),
-			frame,
-			Enum.Material.Wood,
-			model
-		)
-		block("Post", Vector3.new(leg, 4.3, leg), base * CFrame.new(x, 2.15, lz), frame, Enum.Material.Wood, model)
+	-- Legs taper towards the floor and splay out a little; back legs kick backwards.
+	local lx, lz = w / 2 - 0.14, d / 2 - 0.14
+	local legTop = seatTop - 0.22
+	for _, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		local x, z = corner[1] * lx, corner[2] * lz
+		local foot = at(x * 1.06, 0, z + (if corner[2] > 0 then 0.18 else -0.04))
+		local knee = at(x, legTop / 2, z + (if corner[2] > 0 then 0.06 else 0))
+		beam("Leg", at(x, legTop, z), knee, 0.22, 0.22, frame, model)
+		beam("Leg", knee, foot, 0.17, 0.17, frame, model)
 	end
-	-- Apron under the seat edge.
+	-- Stretchers between the legs, and an apron under the seat edge.
+	for _, x in { -lx, lx } do
+		beam("Stretcher", at(x * 1.03, 0.65, -lz - 0.02), at(x * 1.03, 0.65, lz + 0.1), 0.1, 0.12, frame, model)
+	end
+	beam("Stretcher", at(-lx * 1.02, 0.9, -lz), at(lx * 1.02, 0.9, -lz), 0.1, 0.12, frame, model)
 	block(
 		"Apron",
-		Vector3.new(w - 0.1, 0.3, 0.12),
-		base * CFrame.new(0, seatTop - 0.4, -lz),
+		Vector3.new(w - 0.3, 0.26, 0.1),
+		base * CFrame.new(0, legTop - 0.13, -lz),
 		frame,
 		Enum.Material.Wood,
 		model
 	)
 	block(
 		"Apron",
-		Vector3.new(w - 0.1, 0.3, 0.12),
-		base * CFrame.new(0, seatTop - 0.4, lz),
+		Vector3.new(0.1, 0.26, d - 0.3),
+		base * CFrame.new(-lx, legTop - 0.13, 0),
 		frame,
 		Enum.Material.Wood,
 		model
 	)
+	block(
+		"Apron",
+		Vector3.new(0.1, 0.26, d - 0.3),
+		base * CFrame.new(lx, legTop - 0.13, 0),
+		frame,
+		Enum.Material.Wood,
+		model
+	)
+
+	-- The back leans 12 degrees. Positions in the back are (x, height above seat, curve depth).
+	local lean = math.rad(12)
+	local back = base * CFrame.new(0, seatTop, lz) * CFrame.Angles(lean, 0, 0)
+	local function onBack(x: number, y: number, z: number): Vector3
+		return back:PointToWorldSpace(Vector3.new(x, y, z))
+	end
+	local height = 2.25
+	local function curve(x: number): number
+		return 0.16 * (1 - (x / (w / 2)) ^ 2) -- the crest rail bows backwards in the middle
+	end
 	for _, x in { -lx, lx } do
-		block(
-			"Apron",
-			Vector3.new(0.12, 0.3, d - 0.1),
-			base * CFrame.new(x, seatTop - 0.4, 0),
+		beam("Post", at(x, legTop, lz), onBack(x, height + 0.1, 0), 0.2, 0.2, frame, model)
+	end
+	-- Crest rail in short segments along the curve, taller in the middle.
+	local segments = 6
+	for i = 1, segments do
+		local x1 = -lx + (i - 1) * (2 * lx) / segments
+		local x2 = -lx + i * (2 * lx) / segments
+		local mid = (x1 + x2) / 2
+		local tall = 0.34 + 0.12 * (1 - math.abs(mid) / lx)
+		beam(
+			"CrestRail",
+			onBack(x1, height - tall / 2 + 0.1, curve(x1)),
+			onBack(x2, height - tall / 2 + 0.1, curve(x2)),
+			tall,
+			0.14,
 			frame,
-			Enum.Material.Wood,
 			model
 		)
 	end
-	-- Back: a wide top rail, a thin bottom rail just above the seat, and spindles between them.
-	local railTop, railBottom = 4.1, seatTop + 0.35
-	block("TopRail", Vector3.new(w, 0.5, 0.22), base * CFrame.new(0, railTop, lz), frame, Enum.Material.Wood, model)
-	block(
-		"BottomRail",
-		Vector3.new(w - 2 * leg, 0.14, 0.16),
-		base * CFrame.new(0, railBottom, lz),
-		frame,
-		Enum.Material.Wood,
-		model
-	)
+	beam("BackRail", onBack(-lx, 0.4, 0), onBack(lx, 0.4, 0), 0.12, 0.12, frame, model)
 	local spindles = 9
-	local span = w - 2 * leg - 0.2
-	local height = (railTop - 0.25) - (railBottom + 0.07)
 	for i = 1, spindles do
-		local x = -span / 2 + (i - 1) * span / (spindles - 1)
-		block(
-			"Spindle",
-			Vector3.new(0.08, height, 0.08),
-			base * CFrame.new(x, railBottom + 0.07 + height / 2, lz),
-			frame,
-			Enum.Material.Wood,
-			model
-		)
+		local x = -lx + 0.22 + (i - 1) * (2 * lx - 0.44) / (spindles - 1)
+		local tall = 0.34 + 0.12 * (1 - math.abs(x) / lx)
+		beam("Spindle", onBack(x, 0.45, 0), onBack(x, height - tall + 0.12, curve(x)), 0.07, 0.07, frame, model)
 	end
 
 	model.Parent = parent
@@ -358,8 +406,8 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 
 	block(
 		"Deck",
-		Vector3.new(24, 0.2, 24),
-		cf * CFrame.new(0, 0.1, 3),
+		Vector3.new(17, 0.2, 17),
+		cf * CFrame.new(0, 0.1, 2),
 		Color3.fromRGB(196, 158, 112),
 		Enum.Material.WoodPlanks,
 		model
@@ -378,7 +426,7 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 				-- Invisible click targets over each square; the marker gui draws X and O on them.
 				local tile = block(
 					key,
-					Vector3.new(1.9, 0.05, 1.9),
+					Vector3.new(1.9 * Config.BOARD_SCALE, 0.05, 1.9 * Config.BOARD_SCALE),
 					cf * CFrame.new(Config.cellOffset(side, col, row) + Vector3.new(0, 0.05, 0)),
 					PAPER,
 					Enum.Material.SmoothPlastic,
@@ -422,7 +470,7 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 	local anchor = block(
 		"Sign",
 		Vector3.new(0.2, 0.2, 0.2),
-		cf * CFrame.new(0, top + 9, -1.2),
+		cf * CFrame.new(0, top + 7, 1),
 		BLACK,
 		Enum.Material.SmoothPlastic,
 		model

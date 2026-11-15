@@ -14,8 +14,13 @@ Config.RESULT_TIME = 6 -- seconds the result shows before the table resets
 
 Config.TABLE_COUNT = 10
 Config.TABLE_TOP = 3.2 -- table surface height above the floor
-Config.CELL = 2 -- studs per board square
-Config.SHEET_X = { 5, -5 } -- centre of each player's sheet; side 1 is on the camera's left
+-- Board size relative to the original 2-stud squares; everything on the table scales with it.
+Config.BOARD_SCALE = 0.68
+Config.CELL = 2 * Config.BOARD_SCALE -- studs per board square
+Config.BELL_SCALE = Config.BOARD_SCALE
+Config.SHEET_X = { 3.4, -3.4 } -- centre of each player's sheet; side 1 is on the camera's left
+Config.TABLE_SIZE = Vector2.new(13.5, 9) -- width (X) and depth (Z) of the tabletop
+Config.CHAIR_Z = 5.9 -- chairs sit this far out on the +Z side
 
 Config.SOUNDS = {
 	Kling = "rbxassetid://9125485591", -- desk bell, single ringing ding (ProSoundEffects)
@@ -47,11 +52,12 @@ function Config.allKeys(): { string }
 end
 
 -- Both players sit at +Z facing -Z, towards a fixed camera at -Z, like a video filmed from
--- across the table. The sheets read the right way up for that camera: a 7 x 11 stud sheet with
+-- across the table. The sheets read the right way up for that camera: a sheet of 3.5 x 5.5 squares with
 -- column letters along the edge nearest the players, row numbers down the camera's left side,
 -- and row 1 nearest the players. The camera's left is +X.
 function Config.gridOrigin(side: number): Vector3
-	return Vector3.new(Config.SHEET_X[side] - 0.5, Config.TABLE_TOP + 0.04, -0.5)
+	local s = Config.BOARD_SCALE
+	return Vector3.new(Config.SHEET_X[side] - 0.5 * s, Config.TABLE_TOP + 0.04, -0.5 * s)
 end
 
 -- Where a square's surface is, relative to the table's pivot.

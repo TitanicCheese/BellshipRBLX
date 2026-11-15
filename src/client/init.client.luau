@@ -71,8 +71,8 @@ local function updateCamera()
 		setSign(model, false)
 		local cf = model.WorldPivot
 		-- A fixed shot from across the table, like the video: both players and both sheets.
-		local eye = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 7.5, -11.5))
-		local focus = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 1.6, 2.5))
+		local eye = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 5.6, -8.6))
+		local focus = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 1.3, 1.9))
 		camera.CameraType = Enum.CameraType.Scriptable
 		TweenService:Create(camera, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
 			CFrame = CFrame.lookAt(eye, focus),
@@ -96,7 +96,7 @@ local function renderBells()
 		if alive then
 			local col, row = Config.parse(key)
 			local cf = model.WorldPivot * CFrame.new(Config.cellOffset(state.side, col :: number, row :: number))
-			Bell.build(cf).Parent = myBells
+			Bell.build(cf, Config.BELL_SCALE).Parent = myBells
 		end
 	end
 end

@@ -332,15 +332,15 @@ function Match.showStrike(self: Match, target: number, key: string, hit: boolean
 	if hit then
 		-- The bell appears, its plunger snaps down and it rings. Then it is taken off the
 		-- sheet and the square gets a red X, like crossing it out with a marker.
-		local bell = Bell.build(cf)
+		local bell = Bell.build(cf, Config.BELL_SCALE)
 		bell.Parent = self.refs.markers
 		local dome, stem, knob =
 			bell:FindFirstChild("Dome") :: Part,
 			bell:FindFirstChild("Stem") :: Part,
 			bell:FindFirstChild("Knob") :: Part
 		local press = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(stem, press, { CFrame = stem.CFrame - Vector3.new(0, 0.14, 0) }):Play()
-		TweenService:Create(knob, press, { CFrame = knob.CFrame - Vector3.new(0, 0.14, 0) }):Play()
+		TweenService:Create(stem, press, { CFrame = stem.CFrame - Vector3.new(0, 0.14 * Config.BELL_SCALE, 0) }):Play()
+		TweenService:Create(knob, press, { CFrame = knob.CFrame - Vector3.new(0, 0.14 * Config.BELL_SCALE, 0) }):Play()
 		playSound(dome, Config.SOUNDS.Kling, 1, 0.97 + math.random() * 0.06)
 		sparkle(dome, Bell.SHINE, 30)
 		local light = Instance.new("PointLight")
@@ -374,7 +374,7 @@ function Match.finish(self: Match, winner: number, reason: string)
 	-- Show where the winner's surviving bells were.
 	for key, alive in self.bells[winner] do
 		if alive then
-			local bell = Bell.build(self:cellCFrame(winner, key))
+			local bell = Bell.build(self:cellCFrame(winner, key), Config.BELL_SCALE)
 			bell.Parent = self.refs.markers
 			sparkle(bell:FindFirstChild("Dome") :: Part, Bell.SHINE, 12)
 		end
