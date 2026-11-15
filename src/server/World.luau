@@ -1,4 +1,4 @@
--- Builds the sky island at runtime: floating rock, grass, plaza with a giant bell, trees,
+-- Builds the sky island at runtime: a square studded platform, plaza with a giant bell, trees,
 -- clouds, lighting, and the spawn. Returns where the game tables go.
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,56 +35,65 @@ local function disc(r: number, h: number, pos: Vector3, color: Color3, material:
 	}, parent)
 end
 
+World.SIZE = 140 -- the island is a square this many studs across
+
+-- A plain block with classic Roblox studs on top.
+local function studded(size: Vector3, pos: Vector3, color: Color3, parent: Instance): Part
+	return part({
+		Size = size,
+		CFrame = CFrame.new(pos),
+		Color = color,
+		Material = Enum.Material.Plastic,
+		TopSurface = Enum.SurfaceType.Studs,
+	}, parent)
+end
+
+-- A square, studded grass platform on a stepped base of dirt and rock that narrows downwards.
 local function island(parent: Instance, rng: Random)
 	local folder = Instance.new("Folder")
 	folder.Name = "Island"
 	folder.Parent = parent
-	disc(75, 4, Vector3.new(0, TOP - 2, 0), Color3.fromRGB(104, 162, 72), Enum.Material.Grass, folder)
-	disc(73, 6, Vector3.new(0, TOP - 6.5, 0), Color3.fromRGB(122, 92, 62), Enum.Material.Ground, folder)
-	local layers = { { 66, 10 }, { 54, 12 }, { 40, 14 }, { 26, 14 }, { 13, 12 }, { 5, 10 } }
-	local y = TOP - 9.5
-	for i, layer in layers do
-		local r, h = layer[1], layer[2]
-		y -= h / 2
-		local shade = 112 - i * 6
-		local offset = Vector3.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
-		disc(
-			r,
-			h,
-			Vector3.new(0, y, 0) + offset,
-			Color3.fromRGB(shade, shade - 4, shade - 8),
-			Enum.Material.Rock,
+	local size = World.SIZE
+	local grass = Color3.fromRGB(75, 151, 75)
+	local dirt = Color3.fromRGB(124, 92, 70)
+	studded(Vector3.new(size, 4, size), Vector3.new(0, TOP - 2, 0), grass, folder)
+	part(
+		{
+			Size = Vector3.new(size, 6, size),
+			CFrame = CFrame.new(0, TOP - 7, 0),
+			Color = dirt,
+			Material = Enum.Material.Plastic,
+		},
+		folder
+	)
+	local y = TOP - 10
+	for i, layer in { { 0.82, 10 }, { 0.6, 10 }, { 0.38, 10 }, { 0.16, 8 } } do
+		local width, height = size * layer[1], layer[2]
+		local shade = 120 - i * 10
+		part({
+			Size = Vector3.new(width, height, width),
+			CFrame = CFrame.new(0, y - height / 2, 0),
+			Color = Color3.fromRGB(shade, shade, shade + 4),
+			Material = Enum.Material.Plastic,
+		}, folder)
+		y -= height
+	end
+	-- A few small studded islands floating around the big one.
+	for _ = 1, 8 do
+		local angle = rng:NextNumber(0, math.pi * 2)
+		local radius = rng:NextNumber(110, 150)
+		local w = math.round(rng:NextNumber(6, 12))
+		local pos = Vector3.new(math.cos(angle) * radius, TOP + rng:NextNumber(-35, 12), math.sin(angle) * radius)
+		studded(Vector3.new(w, 2, w), pos, grass, folder)
+		part(
+			{
+				Size = Vector3.new(w * 0.7, w * 0.6, w * 0.7),
+				CFrame = CFrame.new(pos - Vector3.new(0, 1 + w * 0.3, 0)),
+				Color = dirt,
+				Material = Enum.Material.Plastic,
+			},
 			folder
 		)
-		y -= h / 2 - 1
-	end
-	-- Jagged rocks around the underside so the island does not look like a stack of discs.
-	for _ = 1, 26 do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local depth = rng:NextNumber(10, 45)
-		local radius = math.max(8, 70 - depth * 1.2) * rng:NextNumber(0.8, 1)
-		local size = Vector3.new(rng:NextNumber(8, 16), rng:NextNumber(10, 22), rng:NextNumber(8, 16))
-		part({
-			Size = size,
-			CFrame = CFrame.new(math.cos(angle) * radius, TOP - 8 - depth, math.sin(angle) * radius)
-				* CFrame.Angles(rng:NextNumber(-0.5, 0.5), rng:NextNumber(0, 6), rng:NextNumber(-0.5, 0.5)),
-			Color = Color3.fromRGB(96, 90, 84),
-			Material = Enum.Material.Rock,
-		}, folder)
-	end
-	-- Small floating rocks.
-	for _ = 1, 10 do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(95, 140)
-		local pos = Vector3.new(math.cos(angle) * radius, TOP + rng:NextNumber(-40, 15), math.sin(angle) * radius)
-		local r = rng:NextNumber(3, 7)
-		disc(r, r * 0.6, pos + Vector3.new(0, r * 0.3, 0), Color3.fromRGB(104, 162, 72), Enum.Material.Grass, folder)
-		part({
-			Size = Vector3.new(r * 1.6, r * 1.6, r * 1.6),
-			CFrame = CFrame.new(pos - Vector3.new(0, r * 0.6, 0)) * CFrame.Angles(0.6, rng:NextNumber(0, 6), 0.6),
-			Color = Color3.fromRGB(100, 94, 88),
-			Material = Enum.Material.Rock,
-		}, folder)
 	end
 end
 
@@ -92,7 +101,16 @@ local function plaza(parent: Instance): CFrame
 	local folder = Instance.new("Folder")
 	folder.Name = "Plaza"
 	folder.Parent = parent
-	disc(22, 0.4, Vector3.new(0, TOP + 0.2, 0), Color3.fromRGB(214, 206, 190), Enum.Material.Slate, folder)
+	part(
+		{
+			Size = Vector3.new(44, 0.4, 44),
+			CFrame = CFrame.new(0, TOP + 0.2, 0),
+			Color = Color3.fromRGB(196, 196, 196),
+			Material = Enum.Material.Plastic,
+			TopSurface = Enum.SurfaceType.Studs,
+		},
+		folder
+	)
 	disc(7, 3, Vector3.new(0, TOP + 1.9, 0), Color3.fromRGB(236, 232, 224), Enum.Material.Marble, folder)
 	local statue = Bell.build(CFrame.new(0, TOP + 3.4, 0), 7)
 	statue.Name = "GiantBell"
