@@ -1,6 +1,7 @@
 -- Builds one game table: a black table with two paper sheets side by side, a divider
 -- between them, two chairs on the same side, and a floating sign.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
@@ -186,8 +187,110 @@ local function divider(cf: CFrame, parent: Instance)
 	end
 end
 
+-- Wooden furniture from the Creator Store, kept in the place file under
+-- ServerStorage.Furniture (Table: asset 11802731038, Chair: asset 873982846). If it is missing,
+-- the plain parts below are used instead.
+local function furniture(name: string): Model?
+	local folder = ServerStorage:FindFirstChild("Furniture")
+	local template = folder and folder:FindFirstChild(name)
+	if not (template and template:IsA("Model")) then
+		return nil
+	end
+	local model = template:Clone()
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy() -- never run code that came with a free model
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+		end
+	end
+	return model
+end
+
+-- Stretches a model so its bounding box becomes `target`. Straight parts scale per axis; slanted
+-- ones (braces) are rebuilt between their scaled end points so they stay attached.
+local function stretch(model: Model, target: Vector3)
+	local box, size = model:GetBoundingBox()
+	local scale = target / size
+	local thin = (scale.X + scale.Y + scale.Z) / 3
+	for _, p in model:GetDescendants() do
+		if not p:IsA("BasePart") then
+			continue
+		end
+		local l = box:ToObjectSpace(p.CFrame)
+		local axes = { l.XVector, l.YVector, l.ZVector }
+		local dims = { p.Size.X, p.Size.Y, p.Size.Z }
+		local pos = l.Position * scale
+		local straight = true
+		for _, a in axes do
+			if math.max(math.abs(a.X), math.abs(a.Y), math.abs(a.Z)) < 0.99 then
+				straight = false
+			end
+		end
+		if straight then
+			local new = {}
+			for i, a in axes do
+				new[i] = dims[i] * (math.abs(a.X) * scale.X + math.abs(a.Y) * scale.Y + math.abs(a.Z) * scale.Z)
+			end
+			p.Size = Vector3.new(new[1], new[2], new[3])
+			p.CFrame = box * (CFrame.new(pos) * l.Rotation)
+		else
+			local long = 1
+			for i = 2, 3 do
+				if dims[i] > dims[long] then
+					long = i
+				end
+			end
+			local dir = axes[long] * scale
+			local others = {}
+			for i = 1, 3 do
+				if i ~= long then
+					table.insert(others, dims[i] * thin)
+				end
+			end
+			p.Size = Vector3.new(others[1], others[2], dims[long] * dir.Magnitude)
+			p.CFrame = box * CFrame.lookAt(pos, pos + dir.Unit)
+		end
+	end
+end
+
+-- Moves a model so the bottom centre of its bounding box lands on `cf`.
+local function placeOn(model: Model, cf: CFrame)
+	local box, size = model:GetBoundingBox()
+	model.WorldPivot = box * CFrame.new(0, -size.Y / 2, 0)
+	model:PivotTo(cf)
+end
+
+-- The wooden table, stretched to 20 x 13 studs with its top at TABLE_TOP. Its long side runs
+-- along the model's Z axis, so it is turned to run along the table's X axis.
+local function woodenTable(cf: CFrame, parent: Instance): boolean
+	local model = furniture("Table")
+	if not model then
+		return false
+	end
+	local _, size = model:GetBoundingBox()
+	local long = size.Z >= size.X
+	stretch(model, if long then Vector3.new(13, Config.TABLE_TOP, 20) else Vector3.new(20, Config.TABLE_TOP, 13))
+	placeOn(model, cf * CFrame.Angles(0, if long then math.pi / 2 else 0, 0))
+	model.Name = "WoodenTable"
+	model.Parent = parent
+	return true
+end
+
 local function chair(side: number, cf: CFrame, parent: Instance): Seat
 	-- Both chairs sit on the +Z side facing -Z, behind their player's sheet.
+	local wooden = furniture("Chair")
+	local seatPart = wooden and wooden:FindFirstChildWhichIsA("Seat", true)
+	if wooden and seatPart then
+		-- The chair model faces -Z with its back at +Z, the way we need it.
+		placeOn(wooden, cf * CFrame.new(Config.SHEET_X[side], 0, 8.3))
+		seatPart.Name = "Seat" .. side
+		wooden.Name = "Chair" .. side
+		wooden.Parent = parent
+		return seatPart
+	elseif wooden then
+		wooden:Destroy()
+	end
 	local seatCf = cf * CFrame.new(Config.SHEET_X[side], 1.9, 8.4)
 	local seat = Instance.new("Seat")
 	seat.Name = "Seat" .. side
@@ -235,25 +338,27 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 		Enum.Material.WoodPlanks,
 		model
 	)
-	local tabletop = block(
-		"Top",
-		Vector3.new(20, 0.8, 13),
-		cf * CFrame.new(0, top - 0.4, 0),
-		BLACK,
-		Enum.Material.SmoothPlastic,
-		model
-	)
-	tabletop.Material = Enum.Material.Plastic
-	for _, x in { -9.2, 9.2 } do
-		for _, z in { -5.7, 5.7 } do
-			block(
-				"Leg",
-				Vector3.new(0.7, top - 0.8, 0.7),
-				cf * CFrame.new(x, (top - 0.8) / 2, z),
-				BLACK,
-				Enum.Material.SmoothPlastic,
-				model
-			)
+	if not woodenTable(cf, model) then
+		local tabletop = block(
+			"Top",
+			Vector3.new(20, 0.8, 13),
+			cf * CFrame.new(0, top - 0.4, 0),
+			BLACK,
+			Enum.Material.SmoothPlastic,
+			model
+		)
+		tabletop.Material = Enum.Material.Plastic
+		for _, x in { -9.2, 9.2 } do
+			for _, z in { -5.7, 5.7 } do
+				block(
+					"Leg",
+					Vector3.new(0.7, top - 0.8, 0.7),
+					cf * CFrame.new(x, (top - 0.8) / 2, z),
+					BLACK,
+					Enum.Material.SmoothPlastic,
+					model
+				)
+			end
 		end
 	end
 

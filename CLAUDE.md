@@ -9,3 +9,6 @@ Roblox game, Rojo project. Code lives in `src/` (server, client, shared); see RE
 - Run Luau in Studio: `STUDIO=Bellship bun tools/mcp.ts luau Edit < code.luau`
   (set `STUDIO_MCP` to the newest `%LOCALAPPDATA%\Roblox\Versions\*\StudioMCP.exe`).
 - Strict Luau, format with StyLua, lint with selene. LF line endings.
+- Creator Store furniture lives only in the place file, in `ServerStorage.Furniture` (Table = asset
+  11802731038, Chair = asset 873982846; scripts stripped). `TableBuilder` clones and stretches it and
+  falls back to plain parts if it is missing, e.g. in a fresh `rojo build`.
