@@ -186,11 +186,11 @@ function Hud.update(state: { [string]: any }?, total: number)
 		subtitle.Text = "Someone has to sit across from you · jump to leave"
 	elseif phase == "placing" then
 		title.Text = "Place your bells"
-		subtitle.Text = string.format("Click squares on your side · %d/%d placed", state.myAlive, total)
+		subtitle.Text = string.format("Click squares on your sheet · %d/%d placed", state.myAlive, total)
 	elseif phase == "battle" then
 		if state.turn == state.side then
 			title.Text = "Your turn!"
-			subtitle.Text = "Press a square on " .. opponent .. "'s side"
+			subtitle.Text = "Press a square on " .. opponent .. "'s sheet"
 		elseif state.turn == 0 then
 			local last = state.last
 			title.Text = if last and last.hit then "DING!" else "Miss"

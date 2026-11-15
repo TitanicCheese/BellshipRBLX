@@ -70,9 +70,9 @@ local function updateCamera()
 	if model and state then
 		setSign(model, false)
 		local cf = model.WorldPivot
-		local s = if state.side == 1 then 1 else -1
-		local eye = cf:PointToWorldSpace(Vector3.new(0, 18, s * 12.5))
-		local focus = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP, -s * 1))
+		-- A fixed shot from across the table, like the video: both players and both sheets.
+		local eye = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 7.5, -11.5))
+		local focus = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 1.6, 2.5))
 		camera.CameraType = Enum.CameraType.Scriptable
 		TweenService:Create(camera, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
 			CFrame = CFrame.lookAt(eye, focus),
@@ -86,19 +86,6 @@ local function updateCamera()
 	end
 end
 
--- Square labels face whoever is sitting, so they read the right way up.
-local function orientLabels(model: Model?)
-	if not model or not state then
-		return
-	end
-	for _, tile in (model:FindFirstChild("Tiles") :: Folder):GetChildren() do
-		local text = tile:FindFirstChild("Label", true) :: TextLabel?
-		if text then
-			text.Rotation = if state.side == 1 then 90 else -90
-		end
-	end
-end
-
 local function renderBells()
 	myBells:ClearAllChildren()
 	local model = tableModel()
@@ -107,9 +94,9 @@ local function renderBells()
 	end
 	for key, alive in state.myBells do
 		if alive then
-			local row, col = Config.parse(key)
-			Bell.build(model.WorldPivot * CFrame.new(Config.cellOffset(state.side, row :: number, col :: number))).Parent =
-				myBells
+			local col, row = Config.parse(key)
+			local cf = model.WorldPivot * CFrame.new(Config.cellOffset(state.side, col :: number, row :: number))
+			Bell.build(cf).Parent = myBells
 		end
 	end
 end
@@ -202,7 +189,6 @@ stateEvent.OnClientEvent:Connect(function(newState: { [string]: any })
 	local previous = state
 	state = if newState.phase == "none" then nil else newState
 	updateCamera()
-	orientLabels(tableModel())
 	renderBells()
 	Hud.update(state, Config.BELLS)
 	if state and state.phase == "battle" then

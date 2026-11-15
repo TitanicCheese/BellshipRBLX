@@ -152,13 +152,28 @@ function Match.evaluate(self: Match)
 	end
 end
 
+local function markGui(tile: BasePart): SurfaceGui
+	return tile:FindFirstChild("Mark") :: SurfaceGui
+end
+
 function Match.clearBoard(self: Match)
 	self.refs.markers:ClearAllChildren()
 	for side = 1, 2 do
 		for _, tile in self.refs.tiles[side] do
-			tile.Color = TableBuilder.TILE_COLOR
+			local label = markGui(tile):FindFirstChild("Text") :: TextLabel
+			label.Text = ""
 		end
 	end
+end
+
+-- Marks a square like on paper: a red marker X for a pressed bell, a doodled O for a miss.
+local function draw(tile: BasePart, hit: boolean, delay: number)
+	local label = markGui(tile):FindFirstChild("Text") :: TextLabel
+	label.Text = if hit then "X" else "O"
+	label.TextColor3 = if hit then Color3.fromRGB(214, 34, 40) else Color3.fromRGB(105, 105, 115)
+	label.TextTransparency = 1
+	local info = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, delay)
+	TweenService:Create(label, info, { TextTransparency = 0 }):Play()
 end
 
 function Match.startPlacing(self: Match)
@@ -291,8 +306,8 @@ function Match.strike(self: Match, side: number, key: string)
 end
 
 function Match.cellCFrame(self: Match, side: number, key: string): CFrame
-	local row, col = Config.parse(key)
-	return self.refs.cf * CFrame.new(Config.cellOffset(side, row :: number, col :: number))
+	local col, row = Config.parse(key)
+	return self.refs.cf * CFrame.new(Config.cellOffset(side, col :: number, row :: number))
 end
 
 local function sparkle(parent: BasePart, color: Color3, count: number)
@@ -315,7 +330,8 @@ function Match.showStrike(self: Match, target: number, key: string, hit: boolean
 	local tile = self.refs.tiles[target][key]
 	local cf = self:cellCFrame(target, key)
 	if hit then
-		-- The bell appears, its plunger snaps down, it rings and then goes dull.
+		-- The bell appears, its plunger snaps down and it rings. Then it is taken off the
+		-- sheet and the square gets a red X, like crossing it out with a marker.
 		local bell = Bell.build(cf)
 		bell.Parent = self.refs.markers
 		local dome, stem, knob =
@@ -326,31 +342,26 @@ function Match.showStrike(self: Match, target: number, key: string, hit: boolean
 		TweenService:Create(stem, press, { CFrame = stem.CFrame - Vector3.new(0, 0.14, 0) }):Play()
 		TweenService:Create(knob, press, { CFrame = knob.CFrame - Vector3.new(0, 0.14, 0) }):Play()
 		playSound(dome, Config.SOUNDS.Kling, 1, 0.97 + math.random() * 0.06)
-		sparkle(dome, Bell.GOLD, 30)
+		sparkle(dome, Bell.SHINE, 30)
 		local light = Instance.new("PointLight")
-		light.Color = Bell.GOLD
+		light.Color = Bell.SHINE
 		light.Brightness = 5
 		light.Range = 10
 		light.Parent = dome
-		local fade = TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0.25)
-		TweenService:Create(light, fade, { Brightness = 0 }):Play()
-		TweenService:Create(dome, fade, { Color = Bell.TARNISH, Reflectance = 0 }):Play()
-		TweenService:Create(tile, TweenInfo.new(0.3), { Color = Color3.fromRGB(214, 74, 66) }):Play()
+		TweenService:Create(light, TweenInfo.new(1, Enum.EasingStyle.Quad), { Brightness = 0 }):Play()
+		local lift = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.9)
+		for _, p in bell:GetChildren() do
+			if p:IsA("BasePart") then
+				TweenService:Create(p, lift, { CFrame = p.CFrame + Vector3.new(0, 1.2, 0), Transparency = 1 }):Play()
+			end
+		end
+		task.delay(1.3, function()
+			bell:Destroy()
+		end)
+		draw(tile, true, 1.05)
 	else
-		local disc = Instance.new("Part")
-		disc.Name = "Miss"
-		disc.Shape = Enum.PartType.Cylinder
-		disc.Size = Vector3.new(0.06, 1, 1)
-		disc.CFrame = cf * CFrame.new(0, 0.03, 0) * CFrame.Angles(0, 0, math.pi / 2)
-		disc.Color = Color3.fromRGB(250, 252, 255)
-		disc.Material = Enum.Material.SmoothPlastic
-		disc.Anchored = true
-		disc.CanCollide = false
-		disc.CanQuery = false
-		disc.Parent = self.refs.markers
-		playSound(disc, Config.SOUNDS.Thud, 0.7, 1.25)
-		sparkle(disc, Color3.fromRGB(255, 255, 255), 8)
-		TweenService:Create(tile, TweenInfo.new(0.3), { Color = Color3.fromRGB(140, 156, 178) }):Play()
+		playSound(tile, Config.SOUNDS.Thud, 0.7, 1.25)
+		draw(tile, false, 0)
 	end
 end
 
@@ -365,7 +376,7 @@ function Match.finish(self: Match, winner: number, reason: string)
 		if alive then
 			local bell = Bell.build(self:cellCFrame(winner, key))
 			bell.Parent = self.refs.markers
-			sparkle(bell:FindFirstChild("Dome") :: Part, Bell.GOLD, 12)
+			sparkle(bell:FindFirstChild("Dome") :: Part, Bell.SHINE, 12)
 		end
 	end
 	self.endsAt = now() + Config.RESULT_TIME

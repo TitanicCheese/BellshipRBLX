@@ -170,10 +170,10 @@ end
 local function lighting()
 	Lighting.ClockTime = 14.5
 	Lighting.Brightness = 2.4
-	Lighting.Ambient = Color3.fromRGB(80, 80, 92)
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 158, 178)
+	Lighting.Ambient = Color3.fromRGB(84, 82, 80)
+	Lighting.OutdoorAmbient = Color3.fromRGB(152, 150, 148)
 	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.6
+	Lighting.EnvironmentSpecularScale = 0.15
 	local atmosphere = Instance.new("Atmosphere")
 	atmosphere.Density = 0.3
 	atmosphere.Offset = 0.12
@@ -185,7 +185,7 @@ local function lighting()
 	local bloom = Instance.new("BloomEffect")
 	bloom.Intensity = 0.5
 	bloom.Size = 24
-	bloom.Threshold = 1.4
+	bloom.Threshold = 2
 	bloom.Parent = Lighting
 	local color = Instance.new("ColorCorrectionEffect")
 	color.Saturation = 0.12
