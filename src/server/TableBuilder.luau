@@ -311,7 +311,9 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 				local tile = block(
 					key,
 					Vector3.new(1.9 * Config.BOARD_SCALE, 0.05, 1.9 * Config.BOARD_SCALE),
-					cf * CFrame.new(Config.cellOffset(side, col, row) + Vector3.new(0, 0.05, 0)),
+					cf
+						* CFrame.new(Config.cellOffset(side, col, row) + Vector3.new(0, 0.05, 0))
+						* CFrame.Angles(0, math.pi / 2, 0),
 					PAPER,
 					Enum.Material.SmoothPlastic,
 					tilesFolder
@@ -333,8 +335,8 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 				mark.Name = "Text"
 				mark.BackgroundTransparency = 1
 				mark.AnchorPoint = Vector2.new(0.5, 0.5)
-				mark.Position = UDim2.fromScale(0.5, 0.55)
-				mark.Size = UDim2.fromScale(1.5, 1.5)
+				mark.Position = UDim2.fromScale(0.5, 0.5)
+				mark.Size = UDim2.fromScale(1.1, 1.1)
 				mark.Font = Enum.Font.PermanentMarker
 				mark.TextScaled = true
 				mark.Text = ""
