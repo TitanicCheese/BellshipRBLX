@@ -5,7 +5,9 @@ local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Leaderboards = require(script.Leaderboards)
 local Match = require(script.Match)
+local Stats = require(script.Stats)
 local TableBuilder = require(script.TableBuilder)
 local World = require(script.World)
 
@@ -19,7 +21,9 @@ actionEvent.Name = "Action" -- client -> server: ("toggle" | "strike", square ke
 actionEvent.Parent = remotes
 remotes.Parent = ReplicatedStorage
 
+Stats.start()
 local world = World.build()
+Leaderboards.start(world.boards, workspace:FindFirstChild("World") :: Instance)
 local tablesFolder = Instance.new("Folder")
 tablesFolder.Name = "Tables"
 tablesFolder.Parent = workspace
@@ -43,7 +47,7 @@ local function act(player: Player, kind: unknown, key: unknown)
 end
 actionEvent.OnServerEvent:Connect(act)
 
--- Anyone who falls off the island is put back on the plaza.
+-- Anyone who falls off the island is put back at the spawn.
 task.spawn(function()
 	while true do
 		task.wait(0.5)
@@ -63,6 +67,7 @@ end)
 --   ServerStorage.BellshipDebug:Invoke("sit", tableId, side)   seats the first player
 --   ServerStorage.BellshipDebug:Invoke("act", "toggle"|"strike", key)   acts as the first player
 --   ServerStorage.BellshipDebug:Invoke("state", tableId)
+--   ServerStorage.BellshipDebug:Invoke("stat", "won"|"lost"|"rang")   adds to the first player's stats
 if RunService:IsStudio() then
 	local debug = Instance.new("BindableFunction")
 	debug.Name = "BellshipDebug"
@@ -88,6 +93,16 @@ if RunService:IsStudio() then
 			return "ok"
 		elseif command == "act" then
 			act(Players:GetPlayers()[1], a, b)
+			return "ok"
+		elseif command == "stat" then
+			local player = Players:GetPlayers()[1]
+			if a == "won" then
+				Stats.won(player)
+			elseif a == "lost" then
+				Stats.lost(player)
+			elseif a == "rang" then
+				Stats.rang(player)
+			end
 			return "ok"
 		elseif command == "state" then
 			return string.format(

@@ -1,9 +1,12 @@
--- Builds the sky island at runtime: a square studded platform, plaza with a giant bell, trees,
--- clouds, lighting, and the spawn. Returns where the game tables go.
+-- Builds the sky island at runtime: a studded grass platform, trees, clouds, lighting, and the
+-- spawn. Returns where the spawn, the game tables and the leaderboards go.
+--
+-- Layout (looking down, +Z towards the bottom): the tables fill a grid at the back, and the
+-- spawn is a strip of open grass along the front edge with the leaderboards behind it, so
+-- players spawn facing the tables and seated players face back towards the spawn.
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Bell = require(ReplicatedStorage.Shared.Bell)
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local World = {}
@@ -24,18 +27,17 @@ local function part(props: { [string]: any }, parent: Instance): Part
 	return p
 end
 
--- An upright disc (cylinder) of radius r and height h, centred at pos.
-local function disc(r: number, h: number, pos: Vector3, color: Color3, material: Enum.Material, parent: Instance): Part
-	return part({
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(h, r * 2, r * 2),
-		CFrame = CFrame.new(pos) * UPRIGHT,
-		Color = color,
-		Material = material,
-	}, parent)
-end
+-- The island's footprint on the ground: X from -WIDTH/2 to WIDTH/2, Z from BACK to FRONT.
+World.WIDTH = 240
+World.BACK = -120
+World.FRONT = 0
+local CENTER_Z = (World.BACK + World.FRONT) / 2
+local DEPTH = World.FRONT - World.BACK
 
-World.SIZE = 240 -- the island is a square this many studs across
+-- Table grid: 5 per row, rows going back from FIRST_ROW_Z.
+local GRID_COLUMNS, GRID_SPACING, FIRST_ROW_Z = 5, 22, -40
+-- The spawn strip and the leaderboards behind it, along the front edge.
+local BOARD_Z, SPAWN_Z, BOARD_SPACING = World.FRONT - 6, World.FRONT - 11, 18
 
 -- A plain block with classic Roblox studs on top.
 local function studded(size: Vector3, pos: Vector3, color: Color3, parent: Instance): Part
@@ -48,28 +50,27 @@ local function studded(size: Vector3, pos: Vector3, color: Color3, parent: Insta
 	}, parent)
 end
 
--- A square, studded grass platform on a stepped base of dirt and rock that narrows downwards.
+-- A studded grass platform on a stepped base of dirt and rock that narrows downwards.
 local function island(parent: Instance, rng: Random)
 	local folder = Instance.new("Folder")
 	folder.Name = "Island"
 	folder.Parent = parent
-	local size = World.SIZE
 	local grass = Color3.fromRGB(75, 151, 75)
 	local dirt = Color3.fromRGB(124, 92, 70)
-	studded(Vector3.new(size, 4, size), Vector3.new(0, TOP - 2, 0), grass, folder)
+	studded(Vector3.new(World.WIDTH, 4, DEPTH), Vector3.new(0, TOP - 2, CENTER_Z), grass, folder)
 	part({
-		Size = Vector3.new(size, 6, size),
-		CFrame = CFrame.new(0, TOP - 7, 0),
+		Size = Vector3.new(World.WIDTH, 6, DEPTH),
+		CFrame = CFrame.new(0, TOP - 7, CENTER_Z),
 		Color = dirt,
 		Material = Enum.Material.Plastic,
 	}, folder)
 	local y = TOP - 10
 	for i, layer in { { 0.82, 10 }, { 0.6, 10 }, { 0.38, 10 }, { 0.16, 8 } } do
-		local width, height = size * layer[1], layer[2]
+		local scale, height = layer[1], layer[2]
 		local shade = 120 - i * 10
 		part({
-			Size = Vector3.new(width, height, width),
-			CFrame = CFrame.new(0, y - height / 2, 0),
+			Size = Vector3.new(World.WIDTH * scale, height, DEPTH * scale),
+			CFrame = CFrame.new(0, y - height / 2, CENTER_Z),
 			Color = Color3.fromRGB(shade, shade, shade + 4),
 			Material = Enum.Material.Plastic,
 		}, folder)
@@ -78,9 +79,13 @@ local function island(parent: Instance, rng: Random)
 	-- A few small studded islands floating around the big one.
 	for _ = 1, 8 do
 		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(180, 230)
+		local radius = rng:NextNumber(165, 210)
 		local w = math.round(rng:NextNumber(6, 12))
-		local pos = Vector3.new(math.cos(angle) * radius, TOP + rng:NextNumber(-35, 12), math.sin(angle) * radius)
+		local pos = Vector3.new(
+			math.cos(angle) * radius,
+			TOP + rng:NextNumber(-35, 12),
+			CENTER_Z + math.sin(angle) * radius * 0.7
+		)
 		studded(Vector3.new(w, 2, w), pos, grass, folder)
 		part({
 			Size = Vector3.new(w * 0.7, w * 0.6, w * 0.7),
@@ -91,38 +96,19 @@ local function island(parent: Instance, rng: Random)
 	end
 end
 
-local function plaza(parent: Instance): CFrame
-	local folder = Instance.new("Folder")
-	folder.Name = "Plaza"
-	folder.Parent = parent
-	part({
-		Size = Vector3.new(44, 0.4, 44),
-		CFrame = CFrame.new(0, TOP + 0.2, 0),
-		Color = Color3.fromRGB(196, 196, 196),
-		Material = Enum.Material.Plastic,
-		TopSurface = Enum.SurfaceType.Studs,
-	}, folder)
-	disc(7, 3, Vector3.new(0, TOP + 1.9, 0), Color3.fromRGB(236, 232, 224), Enum.Material.Marble, folder)
-	local statue = Bell.build(CFrame.new(0, TOP + 3.4, 0), 7)
-	statue.Name = "GiantBell"
-	for _, p in statue:GetDescendants() do
-		if p:IsA("BasePart") then
-			p.CanCollide = true
-			p.CanQuery = true
-		end
-	end
-	statue.Parent = folder
-
+-- An invisible spawn strip in front of the leaderboards, facing the tables.
+local function spawnStrip(parent: Instance): CFrame
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "Spawn"
 	spawn.Anchored = true
-	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.CFrame = CFrame.new(0, TOP + 0.1, 14)
+	spawn.Size = Vector3.new(BOARD_SPACING * 2 + 8, 1, 4)
+	spawn.CFrame = CFrame.lookAt(Vector3.new(0, TOP - 0.4, SPAWN_Z), Vector3.new(0, TOP - 0.4, SPAWN_Z - 1))
 	spawn.Transparency = 1
 	spawn.CanCollide = false
+	spawn.CanQuery = false
 	spawn.Neutral = true
 	spawn.Duration = 0
-	spawn.Parent = folder
+	spawn.Parent = parent
 	return spawn.CFrame
 end
 
@@ -156,8 +142,12 @@ local function clouds(parent: Instance, rng: Random)
 	folder.Parent = parent
 	for _ = 1, 34 do
 		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(175, 320)
-		local center = Vector3.new(math.cos(angle) * radius, TOP + rng:NextNumber(-90, 25), math.sin(angle) * radius)
+		local radius = rng:NextNumber(160, 300)
+		local center = Vector3.new(
+			math.cos(angle) * radius,
+			TOP + rng:NextNumber(-90, 25),
+			CENTER_Z + math.sin(angle) * radius * 0.8
+		)
 		for _ = 1, rng:NextInteger(3, 6) do
 			part({
 				Shape = Enum.PartType.Ball,
@@ -203,7 +193,7 @@ local function lighting()
 	Instance.new("Sky").Parent = Lighting
 end
 
-export type WorldInfo = { spawn: CFrame, tables: { CFrame } }
+export type WorldInfo = { spawn: CFrame, tables: { CFrame }, boards: { CFrame } }
 
 function World.build(): WorldInfo
 	local rng = Random.new(1337)
@@ -212,36 +202,44 @@ function World.build(): WorldInfo
 	folder.Parent = workspace
 	lighting()
 	island(folder, rng)
-	local spawn = plaza(folder)
+	local spawn = spawnStrip(folder)
 	clouds(folder, rng)
 	local trees = Instance.new("Folder")
 	trees.Name = "Trees"
 	trees.Parent = folder
 
-	-- Tables in a grid behind the plaza, chairs facing the plaza. The rest of the island stays open.
+	-- Tables in a grid. A table's chairs are on its +Z side, so turning it around puts the chairs
+	-- at the back and seated players look towards the spawn.
 	local tables = {}
-	local columns, spacingX, spacingZ, firstZ = 5, 22, 22, -40
+	local facing = CFrame.Angles(0, math.pi, 0)
 	for i = 1, Config.TABLE_COUNT do
-		local col = (i - 1) % columns
-		local row = (i - 1) // columns
-		local x = (col - (columns - 1) / 2) * spacingX
-		table.insert(tables, CFrame.new(x, TOP, firstZ - row * spacingZ))
+		local col = (i - 1) % GRID_COLUMNS
+		local row = (i - 1) // GRID_COLUMNS
+		local x = (col - (GRID_COLUMNS - 1) / 2) * GRID_SPACING
+		table.insert(tables, CFrame.new(x, TOP, FIRST_ROW_Z - row * GRID_SPACING) * facing)
 	end
 
-	-- Trees around the open grass, kept clear of the plaza, the spawn path and the table grid.
-	local half = World.SIZE / 2 - 8
+	-- Leaderboards side by side along the front edge, facing the tables.
+	local boards = {}
+	for i = -1, 1 do
+		local pos = Vector3.new(i * BOARD_SPACING, TOP, BOARD_Z)
+		table.insert(boards, CFrame.lookAt(pos, pos - Vector3.zAxis))
+	end
+
+	-- Trees on the open grass beside the tables, clear of the grid and the spawn.
+	local half = World.WIDTH / 2 - 8
+	local gridHalf = (GRID_COLUMNS - 1) / 2 * GRID_SPACING + 14
 	local placed = 0
-	while placed < 26 do
-		local pos = Vector3.new(rng:NextNumber(-half, half), TOP, rng:NextNumber(-half, half))
-		local nearPlaza = math.abs(pos.X) < 30 and math.abs(pos.Z) < 30
-		local nearPath = math.abs(pos.X) < 12 and pos.Z > 0
-		local nearTables = math.abs(pos.X) < 62 and pos.Z < -24
-		if not (nearPlaza or nearPath or nearTables) then
+	while placed < 18 do
+		local pos = Vector3.new(rng:NextNumber(-half, half), TOP, rng:NextNumber(World.BACK + 8, World.FRONT - 8))
+		local nearTables = math.abs(pos.X) < gridHalf
+		local nearSpawn = math.abs(pos.X) < BOARD_SPACING * 2 + 12 and pos.Z > FIRST_ROW_Z + 8
+		if not (nearTables or nearSpawn) then
 			tree(pos, rng, trees)
 			placed += 1
 		end
 	end
-	return { spawn = spawn, tables = tables }
+	return { spawn = spawn, tables = tables, boards = boards }
 end
 
 return World

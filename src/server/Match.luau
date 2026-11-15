@@ -8,6 +8,7 @@ local TweenService = game:GetService("TweenService")
 
 local Bell = require(ReplicatedStorage.Shared.Bell)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Stats = require(script.Parent.Stats)
 local TableBuilder = require(script.Parent.TableBuilder)
 
 type Seated = { player: Player?, humanoid: Humanoid, name: string }
@@ -277,6 +278,19 @@ function Match.nextTurn(self: Match, side: number)
 	end)
 end
 
+-- The player on a side, but only when both sides are real players; games against test bots
+-- do not count towards stats.
+function Match.rankedPlayer(self: Match, side: number): Player?
+	local participants = self.participants
+	if not participants or not participants[1] or not participants[2] then
+		return nil
+	end
+	if not participants[1].player or not participants[2].player then
+		return nil
+	end
+	return participants[side].player
+end
+
 function Match.strike(self: Match, side: number, key: string)
 	if self.phase ~= "battle" or self.turn ~= side or self.struck[side][key] then
 		return
@@ -289,6 +303,9 @@ function Match.strike(self: Match, side: number, key: string)
 		self.bells[target][key] = false
 	end
 	self.struck[side][key] = if hit then "hit" else "miss"
+	if hit then
+		Stats.rang(self:rankedPlayer(side))
+	end
 	self.last = { by = side, key = key, hit = hit }
 	self:showStrike(target, key, hit)
 	self:broadcast()
@@ -371,6 +388,11 @@ function Match.finish(self: Match, winner: number, reason: string)
 	self.turn = 0
 	self.winner = winner
 	self.reason = reason
+	-- Only a game played to the last bell counts as a win; leaving still breaks your streak.
+	if reason == "bells" then
+		Stats.won(self:rankedPlayer(winner))
+	end
+	Stats.lost(self:rankedPlayer(other(winner)))
 	-- Show where the winner's surviving bells were.
 	for key, alive in self.bells[winner] do
 		if alive then
