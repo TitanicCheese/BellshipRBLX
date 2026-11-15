@@ -1,6 +1,7 @@
 -- Builds one game table: a black table with two paper sheets side by side, a divider
 -- between them, two chairs on the same side, and a floating sign.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
@@ -283,8 +284,8 @@ end
 
 -- A dark wooden dining chair: tapered legs with stretchers, a seat with a rounded front edge,
 -- and a back that leans back, with a curved crest rail over a row of spindles.
--- Built facing -Z with its back at +Z.
-local function chair(side: number, cf: CFrame, parent: Instance): Seat
+-- Built facing -Z with its back at +Z. Used when the place has no chair model.
+local function builtChair(side: number, cf: CFrame, parent: Instance): Seat
 	local model = Instance.new("Model")
 	model.Name = "Chair" .. side
 	local frame = Color3.fromRGB(78, 42, 24)
@@ -395,6 +396,46 @@ local function chair(side: number, cf: CFrame, parent: Instance): Seat
 		beam("Spindle", onBack(x, 0.45, 0), onBack(x, height - tall + 0.12, curve(x)), 0.07, 0.07, frame, model)
 	end
 
+	model.Parent = parent
+	return seat
+end
+
+-- The chair model chosen in Studio: ServerStorage.Furniture.Chair, turned to face -Z with its
+-- pivot at the bottom centre and a SeatHeight attribute (studs from the floor to the top of the
+-- seat). It lives only in the place file; without it, builtChair is used.
+local function chair(side: number, cf: CFrame, parent: Instance): Seat
+	local folder = ServerStorage:FindFirstChild("Furniture")
+	local template = folder and folder:FindFirstChild("Chair")
+	if not (template and template:IsA("Model")) then
+		return builtChair(side, cf, parent)
+	end
+	local model = template:Clone()
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy() -- never run code that came with a Creator Store model
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+		end
+	end
+	local scale = Config.CHAIR_SCALE
+	if scale ~= 1 then
+		model:ScaleTo(scale)
+	end
+	local place = cf * CFrame.new(Config.SHEET_X[side], 0, Config.CHAIR_Z)
+	model:PivotTo(place)
+	model.Name = "Chair" .. side
+
+	-- An invisible Seat over the model's seat so players can sit on it.
+	local seatHeight = (model:GetAttribute("SeatHeight") :: number? or 2) * scale
+	local seatSize = (model:GetAttribute("SeatSize") :: Vector3? or Vector3.new(2, 0, 2)) * scale
+	local seatOffset = (model:GetAttribute("SeatOffset") :: Vector3? or Vector3.zero) * scale
+	local seat = Instance.new("Seat")
+	seat.Name = "Seat" .. side
+	seat.Anchored = true
+	seat.Transparency = 1
+	seat.Size = Vector3.new(seatSize.X - 0.1, 0.2, seatSize.Z - 0.1)
+	seat.CFrame = place * CFrame.new(seatOffset.X, seatHeight - 0.08, seatOffset.Z)
+	seat.Parent = model
 	model.Parent = parent
 	return seat
 end

@@ -9,5 +9,7 @@ Roblox game, Rojo project. Code lives in `src/` (server, client, shared); see RE
 - Run Luau in Studio: `STUDIO=Bellship bun tools/mcp.ts luau Edit < code.luau`
   (set `STUDIO_MCP` to the newest `%LOCALAPPDATA%\Roblox\Versions\*\StudioMCP.exe`).
 - Strict Luau, format with StyLua, lint with selene. LF line endings.
-- All models (island, tables, chairs, bells) are built from parts in code; nothing comes from the
-  Creator Store, so a fresh `rojo build` has everything except sounds, which are asset ids.
+- Everything is built from parts in code except the chair: the user picked a Creator Store chair,
+  stored only in the place file as `ServerStorage.Furniture.Chair` (turned to face -Z, pivot at the
+  bottom centre, `SeatHeight`/`SeatSize`/`SeatOffset` attributes). `TableBuilder` clones it with an
+  invisible Seat, and falls back to `builtChair` in a fresh `rojo build`.

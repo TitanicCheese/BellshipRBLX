@@ -13,14 +13,15 @@ Config.STRIKE_PAUSE = 1.6 -- seconds between a strike and the next turn
 Config.RESULT_TIME = 6 -- seconds the result shows before the table resets
 
 Config.TABLE_COUNT = 10
-Config.TABLE_TOP = 3.2 -- table surface height above the floor
+Config.TABLE_TOP = 3.6 -- table surface height above the floor (about 1.7x the chair seat height)
 -- Board size relative to the original 2-stud squares; everything on the table scales with it.
 Config.BOARD_SCALE = 0.68
 Config.CELL = 2 * Config.BOARD_SCALE -- studs per board square
 Config.BELL_SCALE = Config.BOARD_SCALE
 Config.SHEET_X = { 3.4, -3.4 } -- centre of each player's sheet; side 1 is on the camera's left
 Config.TABLE_SIZE = Vector2.new(13.5, 9) -- width (X) and depth (Z) of the tabletop
-Config.CHAIR_Z = 5.9 -- chairs sit this far out on the +Z side
+Config.CHAIR_Z = 5.6 -- chairs sit this far out on the +Z side
+Config.CHAIR_SCALE = 1 -- size of the chair model from ServerStorage.Furniture.Chair
 
 Config.SOUNDS = {
 	Kling = "rbxassetid://9125485591", -- desk bell, single ringing ding (ProSoundEffects)
