@@ -9,7 +9,6 @@ Roblox game, Rojo project. Code lives in `src/` (server, client, shared); see RE
 - Run Luau in Studio: `STUDIO=Bellship bun tools/mcp.ts luau Edit < code.luau`
   (set `STUDIO_MCP` to the newest `%LOCALAPPDATA%\Roblox\Versions\*\StudioMCP.exe`).
 - Strict Luau, format with StyLua, lint with selene. LF line endings.
-- Everything is built from parts in code except the chair: the user picked a Creator Store chair,
-  stored only in the place file as `ServerStorage.Furniture.Chair` (turned to face -Z, pivot at the
-  bottom centre, `SeatHeight`/`SeatSize`/`SeatOffset` attributes). `TableBuilder` clones it with an
-  invisible Seat, and falls back to `builtChair` in a fresh `rojo build`.
+- Everything is built from parts in code. The chair the user picked from the Creator Store is stored
+  as part data in `src/server/ChairModel.luau` (dumped from Studio), so nothing lives only in the
+  place file.

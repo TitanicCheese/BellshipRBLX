@@ -21,7 +21,7 @@ Config.BELL_SCALE = Config.BOARD_SCALE
 Config.SHEET_X = { 3.4, -3.4 } -- centre of each player's sheet; side 1 is on the camera's left
 Config.TABLE_SIZE = Vector2.new(13.5, 9) -- width (X) and depth (Z) of the tabletop
 Config.CHAIR_Z = 5.6 -- chairs sit this far out on the +Z side
-Config.CHAIR_SCALE = 1 -- size of the chair model from ServerStorage.Furniture.Chair
+Config.CHAIR_SCALE = 1 -- size of the chair (src/server/ChairModel.luau)
 
 Config.SOUNDS = {
 	Kling = "rbxassetid://9125485591", -- desk bell, single ringing ding (ProSoundEffects)

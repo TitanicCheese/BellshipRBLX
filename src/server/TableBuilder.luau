@@ -1,8 +1,8 @@
 -- Builds one game table: a black table with two paper sheets side by side, a divider
 -- between them, two chairs on the same side, and a floating sign.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 
+local ChairModel = require(script.Parent.ChairModel)
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local TableBuilder = {}
@@ -261,180 +261,23 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	model.Parent = parent
 end
 
--- A square stick running from point a to point b (both in world space).
-local function beam(
-	name: string,
-	a: Vector3,
-	b: Vector3,
-	width: number,
-	depth: number,
-	color: Color3,
-	parent: Instance
-): Part
-	local p = block(
-		name,
-		Vector3.new(width, depth, (b - a).Magnitude),
-		CFrame.lookAt((a + b) / 2, b),
-		color,
-		Enum.Material.Wood,
-		parent
-	)
-	return p
-end
-
--- A dark wooden dining chair: tapered legs with stretchers, a seat with a rounded front edge,
--- and a back that leans back, with a curved crest rail over a row of spindles.
--- Built facing -Z with its back at +Z. Used when the place has no chair model.
-local function builtChair(side: number, cf: CFrame, parent: Instance): Seat
-	local model = Instance.new("Model")
-	model.Name = "Chair" .. side
-	local frame = Color3.fromRGB(78, 42, 24)
-	local seatWood = Color3.fromRGB(122, 64, 34)
-	local base = cf * CFrame.new(Config.SHEET_X[side], 0, Config.CHAIR_Z) -- floor under the seat centre
-	local seatTop = 2.2
-	local w, d = 2.3, 2.2 -- seat width and depth
-	local function at(x: number, y: number, z: number): Vector3
-		return base:PointToWorldSpace(Vector3.new(x, y, z))
-	end
-
-	local seat = Instance.new("Seat")
-	seat.Name = "Seat" .. side
-	seat.Anchored = true
-	seat.Size = Vector3.new(w, 0.22, d - 0.2)
-	seat.CFrame = base * CFrame.new(0, seatTop - 0.11, 0.1)
-	seat.Color = seatWood
-	seat.Material = Enum.Material.Wood
-	seat.TopSurface = Enum.SurfaceType.Smooth
-	seat.BottomSurface = Enum.SurfaceType.Smooth
-	seat.Parent = model
-	-- Rounded front edge: a cylinder along the seat front.
-	local nose = block(
-		"SeatEdge",
-		Vector3.new(w, 0.22, 0.22),
-		base * CFrame.new(0, seatTop - 0.11, -d / 2 + 0.1),
-		seatWood,
-		Enum.Material.Wood,
-		model
-	)
-	nose.Shape = Enum.PartType.Cylinder
-
-	-- Legs taper towards the floor and splay out a little; back legs kick backwards.
-	local lx, lz = w / 2 - 0.14, d / 2 - 0.14
-	local legTop = seatTop - 0.22
-	for _, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
-		local x, z = corner[1] * lx, corner[2] * lz
-		local foot = at(x * 1.06, 0, z + (if corner[2] > 0 then 0.18 else -0.04))
-		local knee = at(x, legTop / 2, z + (if corner[2] > 0 then 0.06 else 0))
-		beam("Leg", at(x, legTop, z), knee, 0.22, 0.22, frame, model)
-		beam("Leg", knee, foot, 0.17, 0.17, frame, model)
-	end
-	-- Stretchers between the legs, and an apron under the seat edge.
-	for _, x in { -lx, lx } do
-		beam("Stretcher", at(x * 1.03, 0.65, -lz - 0.02), at(x * 1.03, 0.65, lz + 0.1), 0.1, 0.12, frame, model)
-	end
-	beam("Stretcher", at(-lx * 1.02, 0.9, -lz), at(lx * 1.02, 0.9, -lz), 0.1, 0.12, frame, model)
-	block(
-		"Apron",
-		Vector3.new(w - 0.3, 0.26, 0.1),
-		base * CFrame.new(0, legTop - 0.13, -lz),
-		frame,
-		Enum.Material.Wood,
-		model
-	)
-	block(
-		"Apron",
-		Vector3.new(0.1, 0.26, d - 0.3),
-		base * CFrame.new(-lx, legTop - 0.13, 0),
-		frame,
-		Enum.Material.Wood,
-		model
-	)
-	block(
-		"Apron",
-		Vector3.new(0.1, 0.26, d - 0.3),
-		base * CFrame.new(lx, legTop - 0.13, 0),
-		frame,
-		Enum.Material.Wood,
-		model
-	)
-
-	-- The back leans 12 degrees. Positions in the back are (x, height above seat, curve depth).
-	local lean = math.rad(12)
-	local back = base * CFrame.new(0, seatTop, lz) * CFrame.Angles(lean, 0, 0)
-	local function onBack(x: number, y: number, z: number): Vector3
-		return back:PointToWorldSpace(Vector3.new(x, y, z))
-	end
-	local height = 2.25
-	local function curve(x: number): number
-		return 0.16 * (1 - (x / (w / 2)) ^ 2) -- the crest rail bows backwards in the middle
-	end
-	for _, x in { -lx, lx } do
-		beam("Post", at(x, legTop, lz), onBack(x, height + 0.1, 0), 0.2, 0.2, frame, model)
-	end
-	-- Crest rail in short segments along the curve, taller in the middle.
-	local segments = 6
-	for i = 1, segments do
-		local x1 = -lx + (i - 1) * (2 * lx) / segments
-		local x2 = -lx + i * (2 * lx) / segments
-		local mid = (x1 + x2) / 2
-		local tall = 0.34 + 0.12 * (1 - math.abs(mid) / lx)
-		beam(
-			"CrestRail",
-			onBack(x1, height - tall / 2 + 0.1, curve(x1)),
-			onBack(x2, height - tall / 2 + 0.1, curve(x2)),
-			tall,
-			0.14,
-			frame,
-			model
-		)
-	end
-	beam("BackRail", onBack(-lx, 0.4, 0), onBack(lx, 0.4, 0), 0.12, 0.12, frame, model)
-	local spindles = 9
-	for i = 1, spindles do
-		local x = -lx + 0.22 + (i - 1) * (2 * lx - 0.44) / (spindles - 1)
-		local tall = 0.34 + 0.12 * (1 - math.abs(x) / lx)
-		beam("Spindle", onBack(x, 0.45, 0), onBack(x, height - tall + 0.12, curve(x)), 0.07, 0.07, frame, model)
-	end
-
-	model.Parent = parent
-	return seat
-end
-
--- The chair model chosen in Studio: ServerStorage.Furniture.Chair, turned to face -Z with its
--- pivot at the bottom centre and a SeatHeight attribute (studs from the floor to the top of the
--- seat). It lives only in the place file; without it, builtChair is used.
+-- The wooden chair (see ChairModel), with an invisible Seat over its seat so players can sit.
 local function chair(side: number, cf: CFrame, parent: Instance): Seat
-	local folder = ServerStorage:FindFirstChild("Furniture")
-	local template = folder and folder:FindFirstChild("Chair")
-	if not (template and template:IsA("Model")) then
-		return builtChair(side, cf, parent)
-	end
-	local model = template:Clone()
-	for _, d in model:GetDescendants() do
-		if d:IsA("LuaSourceContainer") then
-			d:Destroy() -- never run code that came with a Creator Store model
-		elseif d:IsA("BasePart") then
-			d.Anchored = true
-		end
-	end
 	local scale = Config.CHAIR_SCALE
-	if scale ~= 1 then
-		model:ScaleTo(scale)
-	end
 	local place = cf * CFrame.new(Config.SHEET_X[side], 0, Config.CHAIR_Z)
-	model:PivotTo(place)
+	local model = ChairModel.build(place, scale)
 	model.Name = "Chair" .. side
-
-	-- An invisible Seat over the model's seat so players can sit on it.
-	local seatHeight = (model:GetAttribute("SeatHeight") :: number? or 2) * scale
-	local seatSize = (model:GetAttribute("SeatSize") :: Vector3? or Vector3.new(2, 0, 2)) * scale
-	local seatOffset = (model:GetAttribute("SeatOffset") :: Vector3? or Vector3.zero) * scale
 	local seat = Instance.new("Seat")
 	seat.Name = "Seat" .. side
 	seat.Anchored = true
 	seat.Transparency = 1
-	seat.Size = Vector3.new(seatSize.X - 0.1, 0.2, seatSize.Z - 0.1)
-	seat.CFrame = place * CFrame.new(seatOffset.X, seatHeight - 0.08, seatOffset.Z)
+	seat.Size = Vector3.new(ChairModel.SEAT_SIZE.X * scale - 0.1, 0.2, ChairModel.SEAT_SIZE.Y * scale - 0.1)
+	seat.CFrame = place
+		* CFrame.new(
+			ChairModel.SEAT_OFFSET.X * scale,
+			ChairModel.SEAT_HEIGHT * scale - 0.08,
+			ChairModel.SEAT_OFFSET.Y * scale
+		)
 	seat.Parent = model
 	model.Parent = parent
 	return seat
