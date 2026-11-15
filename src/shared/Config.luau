@@ -12,7 +12,7 @@ Config.TURN_TIME = 15 -- seconds per turn before a random square is pressed
 Config.STRIKE_PAUSE = 1.6 -- seconds between a strike and the next turn
 Config.RESULT_TIME = 6 -- seconds the result shows before the table resets
 
-Config.TABLE_COUNT = 10
+Config.TABLE_COUNT = 20
 Config.TABLE_TOP = 3.6 -- table surface height above the floor (about 1.7x the chair seat height)
 -- Board size relative to the original 2-stud squares; everything on the table scales with it.
 Config.BOARD_SCALE = 0.51
