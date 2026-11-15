@@ -152,16 +152,16 @@ local function divider(cf: CFrame, parent: Instance)
 	local top = Config.TABLE_TOP
 	local board = block(
 		"Divider",
-		Vector3.new(1, 4, 4.2),
-		cf * CFrame.new(0, top + 2, 1),
+		Vector3.new(0.75, 4, 3.15),
+		cf * CFrame.new(0, top + 2, 0.75),
 		Color3.fromRGB(122, 74, 150),
 		Enum.Material.SmoothPlastic,
 		parent
 	)
 	block(
 		"Trim",
-		Vector3.new(1.1, 0.3, 4.3),
-		cf * CFrame.new(0, top + 4.1, 1),
+		Vector3.new(0.85, 0.3, 3.25),
+		cf * CFrame.new(0, top + 4.1, 0.75),
 		Color3.fromRGB(230, 200, 120),
 		Enum.Material.SmoothPlastic,
 		parent
@@ -203,11 +203,11 @@ local function woodenTable(cf: CFrame, parent: Instance)
 		Enum.Material.Wood,
 		model
 	)
-	local inset = 0.35
+	local inset = 0.26
 	local apronY = top - 0.5 - 0.35
 	block(
 		"Apron",
-		Vector3.new(w - 2 * inset, 0.7, 0.2),
+		Vector3.new(w - 2 * inset, 0.7, 0.15),
 		cf * CFrame.new(0, apronY, d / 2 - inset),
 		wood,
 		Enum.Material.Wood,
@@ -215,7 +215,7 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	)
 	block(
 		"Apron",
-		Vector3.new(w - 2 * inset, 0.7, 0.2),
+		Vector3.new(w - 2 * inset, 0.7, 0.15),
 		cf * CFrame.new(0, apronY, -(d / 2 - inset)),
 		wood,
 		Enum.Material.Wood,
@@ -223,7 +223,7 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	)
 	block(
 		"Apron",
-		Vector3.new(0.2, 0.7, d - 2 * inset),
+		Vector3.new(0.15, 0.7, d - 2 * inset),
 		cf * CFrame.new(w / 2 - inset, apronY, 0),
 		wood,
 		Enum.Material.Wood,
@@ -231,7 +231,7 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	)
 	block(
 		"Apron",
-		Vector3.new(0.2, 0.7, d - 2 * inset),
+		Vector3.new(0.15, 0.7, d - 2 * inset),
 		cf * CFrame.new(-(w / 2 - inset), apronY, 0),
 		wood,
 		Enum.Material.Wood,
@@ -242,10 +242,10 @@ local function woodenTable(cf: CFrame, parent: Instance)
 	local sections = 4
 	for _, x in { -1, 1 } do
 		for _, z in { -1, 1 } do
-			local lx, lz = x * (w / 2 - inset - 0.2), z * (d / 2 - inset - 0.2)
+			local lx, lz = x * (w / 2 - inset - 0.15), z * (d / 2 - inset - 0.15)
 			for i = 1, sections do
 				local t = (i - 0.5) / sections -- 0 at the top, 1 at the floor
-				local width = 0.6 - 0.25 * t
+				local width = 0.45 - 0.19 * t
 				local h = legHeight / sections
 				block(
 					"Leg",
@@ -290,8 +290,8 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 
 	block(
 		"Deck",
-		Vector3.new(17, 0.2, 17),
-		cf * CFrame.new(0, 0.1, 2),
+		Vector3.new(12.75, 0.2, 12.75),
+		cf * CFrame.new(0, 0.1, 1.5),
 		Color3.fromRGB(196, 158, 112),
 		Enum.Material.WoodPlanks,
 		model
@@ -354,7 +354,7 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 	local anchor = block(
 		"Sign",
 		Vector3.new(0.2, 0.2, 0.2),
-		cf * CFrame.new(0, top + 7, 1),
+		cf * CFrame.new(0, top + 7, 0.75),
 		BLACK,
 		Enum.Material.SmoothPlastic,
 		model
