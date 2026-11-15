@@ -1,0 +1,11 @@
+{
+	"name": "bellship",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"format": "stylua src",
+		"serve": "rojo serve",
+		"build": "rojo build -o build/Bellship.rbxl",
+		"push": "bun tools/push.ts"
+	}
+}
