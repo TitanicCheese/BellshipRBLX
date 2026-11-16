@@ -23,6 +23,7 @@ type Profile = {
 	WeekWins: number,
 	WeekBells: number,
 	WeekBestStreak: number,
+	ChairSkin: string, -- id of the equipped chair skin, "" for the regular chair
 }
 type Entry = { profile: Profile, loaded: boolean, dirty: boolean, leaderstats: Folder, player: Player }
 
@@ -77,6 +78,7 @@ local function newProfile(): Profile
 		WeekWins = 0,
 		WeekBells = 0,
 		WeekBestStreak = 0,
+		ChairSkin = "",
 	}
 end
 
@@ -99,6 +101,7 @@ local function refresh(entry: Entry)
 	for _, stat in Stats.BOARD_STATS do
 		entry.player:SetAttribute(stat, (profile :: any)[stat])
 	end
+	entry.player:SetAttribute("ChairSkin", profile.ChairSkin)
 end
 
 local function load(player: Player)
@@ -136,6 +139,10 @@ local function load(player: Player)
 							profile[key] += data[key]
 						end
 					end
+				end
+				-- Keep a skin equipped while loading; otherwise use the saved one.
+				if profile.ChairSkin == "" and typeof(data.ChairSkin) == "string" then
+					profile.ChairSkin = data.ChairSkin
 				end
 				profile.BestStreak = math.max(profile.BestStreak, profile.Streak)
 				profile.WeekBestStreak = math.max(profile.WeekBestStreak, profile.Streak)
@@ -209,6 +216,18 @@ end
 function Stats.lost(player: Player?)
 	update(player, function(profile)
 		profile.Streak = 0
+	end)
+end
+
+-- The equipped chair skin ("" for the regular chair).
+function Stats.chairSkin(player: Player): string
+	local entry = entries[player]
+	return if entry then entry.profile.ChairSkin else ""
+end
+
+function Stats.setChairSkin(player: Player, id: string)
+	update(player, function(profile)
+		profile.ChairSkin = id
 	end)
 end
 

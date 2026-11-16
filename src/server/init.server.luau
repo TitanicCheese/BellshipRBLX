@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ChairShop = require(script.ChairShop)
 local Leaderboards = require(script.Leaderboards)
 local Match = require(script.Match)
 local Stats = require(script.Stats)
@@ -52,9 +53,14 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 local matches: { Match.Match } = {}
+local seats: { Seat } = {}
 for id, cf in world.tables do
 	matches[id] = Match.new(TableBuilder.build(id, cf, tablesFolder), stateEvent, announce)
+	for _, seat in matches[id].refs.seats do
+		table.insert(seats, seat)
+	end
 end
+ChairShop.start(world.shop, workspace:FindFirstChild("World") :: Instance, seats)
 
 local function act(player: Player, kind: unknown, key: unknown)
 	if typeof(kind) ~= "string" or typeof(key) ~= "string" or not Config.parse(key) then

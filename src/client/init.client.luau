@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Bell = require(Shared:WaitForChild("Bell"))
 local Config = require(Shared:WaitForChild("Config"))
+local ChairShopClient = require(script.ChairShopClient)
 local Hud = require(script.Hud)
 local JoinPrompt = require(script.JoinPrompt)
 local LeaderboardYou = require(script.LeaderboardYou)
@@ -20,6 +21,7 @@ local stateEvent = remotes:WaitForChild("State") :: RemoteEvent
 local actionEvent = remotes:WaitForChild("Action") :: RemoteEvent
 JoinPrompt.start(remotes:WaitForChild("Lobby") :: RemoteEvent, remotes:WaitForChild("Join") :: RemoteEvent)
 LeaderboardYou.start()
+ChairShopClient.start()
 local tables = workspace:WaitForChild("Tables")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera

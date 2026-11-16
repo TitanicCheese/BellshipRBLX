@@ -38,6 +38,8 @@ local GRID_COLUMNS, GRID_SPACING, FIRST_ROW_Z = 5, 22, -40
 local BOARD_Z, SPAWN_Z, BOARD_SPACING = World.FRONT - 6, World.FRONT - 11, 30
 -- Each board has its pedestal on its -X side, so the row is shifted +X to stay centred.
 local BOARD_SHIFT = 3
+-- The chair shop: in line with the leaderboards, in the empty front corner on the -X side.
+local SHOP_X = -84
 
 -- A plain block with classic Roblox studs on top.
 local function studded(size: Vector3, pos: Vector3, color: Color3, parent: Instance): Part
@@ -341,7 +343,7 @@ local function lighting()
 	sky.Parent = Lighting
 end
 
-export type WorldInfo = { spawn: CFrame, tables: { CFrame }, boards: { CFrame } }
+export type WorldInfo = { spawn: CFrame, tables: { CFrame }, boards: { CFrame }, shop: CFrame }
 
 function World.build(): WorldInfo
 	local rng = Random.new(1337)
@@ -383,12 +385,19 @@ function World.build(): WorldInfo
 		local pos = Vector3.new(rng:NextNumber(-half, half), TOP, rng:NextNumber(World.BACK + 8, World.FRONT - 8))
 		local nearTables = math.abs(pos.X) < gridHalf
 		local nearSpawn = math.abs(pos.X) < BOARD_SPACING * 2 + 12 and pos.Z > FIRST_ROW_Z + 8
-		if not (nearTables or nearSpawn) then
+		local nearShop = pos.X < SHOP_X + 40 and pos.Z > FIRST_ROW_Z + 14
+		if not (nearTables or nearSpawn or nearShop) then
 			tree(pos, rng, trees)
 			placed += 1
 		end
 	end
-	return { spawn = spawn, tables = tables, boards = boards }
+	local shop = Vector3.new(SHOP_X, TOP, BOARD_Z)
+	return {
+		spawn = spawn,
+		tables = tables,
+		boards = boards,
+		shop = CFrame.lookAt(shop, shop - Vector3.zAxis),
+	}
 end
 
 return World
