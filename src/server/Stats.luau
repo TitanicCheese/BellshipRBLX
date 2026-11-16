@@ -1,36 +1,66 @@
--- Player stats that persist between sessions: wins, bells rung, and the best win streak.
--- Profiles live in a DataStore, and each stat is mirrored to an OrderedDataStore for the
--- leaderboards. If DataStores are unavailable (for example in Studio without API access) stats
--- still work for the session; a profile that failed to load is never saved, so nothing is wiped.
+-- Player stats that persist between sessions. Lifetime wins and bells rung show in the player
+-- list; the leaderboards use weekly stats (wins, bells rung, best win streak) that reset every
+-- Monday at 00:00 UTC.
+--
+-- Profiles live in a DataStore, and each weekly stat is mirrored to an OrderedDataStore for that
+-- week. If DataStores are unavailable (for example in Studio without API access) stats still work
+-- for the session; a profile that failed to load is never saved, so nothing is wiped.
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
 local Stats = {}
 
-Stats.BOARD_STATS = { "Wins", "BellsRung", "BestStreak" }
+-- The weekly stats shown on the leaderboards. Each is also set as an attribute on the player so
+-- the client can show your own score.
+Stats.BOARD_STATS = { "WeekWins", "WeekBells", "WeekBestStreak" }
 
 type Profile = {
 	Wins: number,
 	BellsRung: number,
 	BestStreak: number,
 	Streak: number,
+	Week: number,
+	WeekWins: number,
+	WeekBells: number,
+	WeekBestStreak: number,
 }
-type Entry = { profile: Profile, loaded: boolean, dirty: boolean, leaderstats: Folder }
+type Entry = { profile: Profile, loaded: boolean, dirty: boolean, leaderstats: Folder, player: Player }
 
 local VERSION = "v1"
-local profiles: DataStore?, ordered: { [string]: OrderedDataStore } = nil, {}
+local WEEK = 7 * 24 * 60 * 60
+local MONDAY = 4 * 24 * 60 * 60 -- the Unix epoch was a Thursday; weeks start on Monday
+
+-- The current week number, and when it ends (Unix time).
+function Stats.week(): (number, number)
+	local week = (os.time() - MONDAY) // WEEK
+	return week, (week + 1) * WEEK + MONDAY
+end
+
+local profiles: DataStore? = nil
 do
 	local ok = pcall(function()
 		profiles = DataStoreService:GetDataStore("BellshipStats_" .. VERSION)
-		for _, stat in Stats.BOARD_STATS do
-			ordered[stat] = DataStoreService:GetOrderedDataStore("Bellship" .. stat .. "_" .. VERSION)
-		end
 	end)
 	if not ok then
 		profiles = nil
-		ordered = {}
 		warn("[Bellship] DataStores unavailable; stats will not be saved")
 	end
+end
+
+local orderedCache: { [string]: OrderedDataStore } = {}
+local function ordered(stat: string, week: number): OrderedDataStore?
+	if not profiles then
+		return nil
+	end
+	local name = string.format("Bellship%s_%s_w%d", stat, VERSION, week)
+	if not orderedCache[name] then
+		local ok, store = pcall(DataStoreService.GetOrderedDataStore, DataStoreService, name)
+		if not ok then
+			return nil
+		end
+		orderedCache[name] = store
+	end
+	return orderedCache[name]
 end
 
 local entries: { [Player]: Entry } = {}
@@ -38,13 +68,37 @@ local changed = Instance.new("BindableEvent")
 Stats.Changed = changed.Event
 
 local function newProfile(): Profile
-	return { Wins = 0, BellsRung = 0, BestStreak = 0, Streak = 0 }
+	return {
+		Wins = 0,
+		BellsRung = 0,
+		BestStreak = 0,
+		Streak = 0,
+		Week = Stats.week(),
+		WeekWins = 0,
+		WeekBells = 0,
+		WeekBestStreak = 0,
+	}
 end
 
-local function refreshLeaderstats(entry: Entry)
-	local folder = entry.leaderstats;
-	(folder:FindFirstChild("Wins") :: IntValue).Value = entry.profile.Wins;
-	(folder:FindFirstChild("Bells") :: IntValue).Value = entry.profile.BellsRung
+-- Starts a fresh week for a profile from an earlier one.
+local function rollWeek(profile: Profile)
+	local week = Stats.week()
+	if profile.Week ~= week then
+		profile.Week = week
+		profile.WeekWins = 0
+		profile.WeekBells = 0
+		profile.WeekBestStreak = 0
+	end
+end
+
+local function refresh(entry: Entry)
+	local folder = entry.leaderstats
+	local profile = entry.profile;
+	(folder:FindFirstChild("Wins") :: IntValue).Value = profile.Wins;
+	(folder:FindFirstChild("Bells") :: IntValue).Value = profile.BellsRung
+	for _, stat in Stats.BOARD_STATS do
+		entry.player:SetAttribute(stat, (profile :: any)[stat])
+	end
 end
 
 local function load(player: Player)
@@ -56,8 +110,10 @@ local function load(player: Player)
 		value.Parent = folder
 	end
 	folder.Parent = player
-	local entry: Entry = { profile = newProfile(), loaded = false, dirty = false, leaderstats = folder }
+	local entry: Entry =
+		{ profile = newProfile(), loaded = false, dirty = false, leaderstats = folder, player = player }
 	entries[player] = entry
+	refresh(entry)
 
 	local store = profiles
 	if store then
@@ -66,22 +122,33 @@ local function load(player: Player)
 		end)
 		if ok then
 			if typeof(data) == "table" then
-				for key, value in entry.profile do
-					local saved = (data :: any)[key]
-					if typeof(saved) == "number" then
+				local profile = entry.profile :: any
+				local sameWeek = data.Week == profile.Week
+				for _, key in { "Wins", "BellsRung", "BestStreak", "Streak" } do
+					if typeof(data[key]) == "number" then
 						-- Add to anything earned while the load was in flight.
-						(entry.profile :: any)[key] = value + saved
+						profile[key] += data[key]
 					end
 				end
-				entry.profile.BestStreak = math.max(entry.profile.BestStreak, entry.profile.Streak)
+				if sameWeek then
+					for _, key in Stats.BOARD_STATS do
+						if typeof(data[key]) == "number" then
+							profile[key] += data[key]
+						end
+					end
+				end
+				profile.BestStreak = math.max(profile.BestStreak, profile.Streak)
+				profile.WeekBestStreak = math.max(profile.WeekBestStreak, profile.Streak)
 			end
 			entry.loaded = true
 		else
 			warn("[Bellship] could not load stats for", player.Name, data)
 		end
 	end
-	refreshLeaderstats(entry)
-	changed:Fire()
+	if entries[player] == entry then
+		refresh(entry)
+		changed:Fire()
+	end
 end
 
 local function save(player: Player)
@@ -91,12 +158,16 @@ local function save(player: Player)
 		return
 	end
 	entry.dirty = false
+	rollWeek(entry.profile)
 	local key = tostring(player.UserId)
 	local snapshot = table.clone(entry.profile)
 	local ok, err = pcall(function()
 		store:SetAsync(key, snapshot, { player.UserId })
 		for _, stat in Stats.BOARD_STATS do
-			ordered[stat]:SetAsync(key, (snapshot :: any)[stat])
+			local board = ordered(stat, snapshot.Week)
+			if board then
+				board:SetAsync(key, (snapshot :: any)[stat])
+			end
 		end
 	end)
 	if not ok then
@@ -110,22 +181,27 @@ local function update(player: Player?, change: (Profile) -> ())
 	if not entry then
 		return
 	end
-	change(entry.profile)
-	entry.profile.BestStreak = math.max(entry.profile.BestStreak, entry.profile.Streak)
+	local profile = entry.profile
+	rollWeek(profile)
+	change(profile)
+	profile.BestStreak = math.max(profile.BestStreak, profile.Streak)
+	profile.WeekBestStreak = math.max(profile.WeekBestStreak, profile.Streak)
 	entry.dirty = true
-	refreshLeaderstats(entry)
+	refresh(entry)
 	changed:Fire()
 end
 
 function Stats.rang(player: Player?)
 	update(player, function(profile)
 		profile.BellsRung += 1
+		profile.WeekBells += 1
 	end)
 end
 
 function Stats.won(player: Player?)
 	update(player, function(profile)
 		profile.Wins += 1
+		profile.WeekWins += 1
 		profile.Streak += 1
 	end)
 end
@@ -136,18 +212,20 @@ function Stats.lost(player: Player?)
 	end)
 end
 
--- Current values for everyone in the server, so boards update without waiting for a save.
+-- This week's values for everyone in the server, so boards update without waiting for a save.
 function Stats.online(stat: string): { [number]: { name: string, value: number } }
+	local week = Stats.week()
 	local result = {}
 	for player, entry in entries do
-		result[player.UserId] = { name = player.Name, value = (entry.profile :: any)[stat] }
+		local value = if entry.profile.Week == week then (entry.profile :: any)[stat] else 0
+		result[player.UserId] = { name = player.DisplayName, value = value }
 	end
 	return result
 end
 
--- The saved top 10 for a stat, as { userId, value }. Empty if DataStores are unavailable.
+-- This week's saved top 10 for a stat, as { userId, value }. Empty if DataStores are unavailable.
 function Stats.top(stat: string): { { userId: number, value: number } }
-	local store = ordered[stat]
+	local store = ordered(stat, Stats.week())
 	local result = {}
 	if not store then
 		return result
@@ -165,6 +243,13 @@ function Stats.top(stat: string): { { userId: number, value: number } }
 		warn("[Bellship] could not read the", stat, "leaderboard:", err)
 	end
 	return result
+end
+
+-- For testing in Studio: set a weekly stat for a player directly.
+function Stats.debugSet(player: Player, stat: string, value: number)
+	update(player, function(profile)
+		(profile :: any)[stat] = value
+	end)
 end
 
 function Stats.start()
@@ -192,8 +277,19 @@ function Stats.start()
 		end
 	end)
 	task.spawn(function()
+		local week = Stats.week()
 		while true do
-			task.wait(120)
+			task.wait(60)
+			-- Save everyone at least every two minutes, and right away when a new week starts.
+			local now = Stats.week()
+			if now ~= week then
+				week = now
+				for _, entry in entries do
+					rollWeek(entry.profile)
+					refresh(entry)
+				end
+				changed:Fire()
+			end
 			for player in entries do
 				task.spawn(save, player)
 			end

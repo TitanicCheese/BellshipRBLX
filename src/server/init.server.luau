@@ -156,7 +156,13 @@ if RunService:IsStudio() then
 				Stats.lost(player)
 			elseif a == "rang" then
 				Stats.rang(player)
+			elseif typeof(a) == "string" and typeof(b) == "number" then
+				Stats.debugSet(player, a, b)
 			end
+			return "ok"
+		elseif command == "fake" then
+			-- ("fake", stat, { { userId, value } }): pretend these scores were saved this week.
+			Leaderboards.debugSaved(a, b)
 			return "ok"
 		elseif command == "state" then
 			return string.format(

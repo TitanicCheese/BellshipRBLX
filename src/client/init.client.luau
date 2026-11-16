@@ -13,11 +13,13 @@ local Bell = require(Shared:WaitForChild("Bell"))
 local Config = require(Shared:WaitForChild("Config"))
 local Hud = require(script.Hud)
 local JoinPrompt = require(script.JoinPrompt)
+local LeaderboardYou = require(script.LeaderboardYou)
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local stateEvent = remotes:WaitForChild("State") :: RemoteEvent
 local actionEvent = remotes:WaitForChild("Action") :: RemoteEvent
 JoinPrompt.start(remotes:WaitForChild("Lobby") :: RemoteEvent, remotes:WaitForChild("Join") :: RemoteEvent)
+LeaderboardYou.start()
 local tables = workspace:WaitForChild("Tables")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera

@@ -35,7 +35,9 @@ local DEPTH = World.FRONT - World.BACK
 -- Table grid: 5 per row, rows going back from FIRST_ROW_Z.
 local GRID_COLUMNS, GRID_SPACING, FIRST_ROW_Z = 5, 22, -40
 -- The spawn strip and the leaderboards behind it, along the front edge.
-local BOARD_Z, SPAWN_Z, BOARD_SPACING = World.FRONT - 6, World.FRONT - 11, 18
+local BOARD_Z, SPAWN_Z, BOARD_SPACING = World.FRONT - 6, World.FRONT - 11, 30
+-- Each board has its pedestal on its -X side, so the row is shifted +X to stay centred.
+local BOARD_SHIFT = 3
 
 -- A plain block with classic Roblox studs on top.
 local function studded(size: Vector3, pos: Vector3, color: Color3, parent: Instance): Part
@@ -367,8 +369,9 @@ function World.build(): WorldInfo
 
 	-- Leaderboards side by side along the front edge, facing the tables.
 	local boards = {}
-	for i = -1, 1 do
-		local pos = Vector3.new(i * BOARD_SPACING, TOP, BOARD_Z)
+	-- Wins first at +X, which is the left side when you face the boards.
+	for i = 1, -1, -1 do
+		local pos = Vector3.new(i * BOARD_SPACING + BOARD_SHIFT, TOP, BOARD_Z)
 		table.insert(boards, CFrame.lookAt(pos, pos - Vector3.zAxis))
 	end
 
