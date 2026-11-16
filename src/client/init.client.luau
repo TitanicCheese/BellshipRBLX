@@ -12,10 +12,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Bell = require(Shared:WaitForChild("Bell"))
 local Config = require(Shared:WaitForChild("Config"))
 local Hud = require(script.Hud)
+local JoinPrompt = require(script.JoinPrompt)
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local stateEvent = remotes:WaitForChild("State") :: RemoteEvent
 local actionEvent = remotes:WaitForChild("Action") :: RemoteEvent
+JoinPrompt.start(remotes:WaitForChild("Lobby") :: RemoteEvent, remotes:WaitForChild("Join") :: RemoteEvent)
 local tables = workspace:WaitForChild("Tables")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -52,23 +54,13 @@ local function inGame(): boolean
 	return state ~= nil and (state.phase == "placing" or state.phase == "battle" or state.phase == "over")
 end
 
-local function setSign(model: Model?, visible: boolean)
-	local sign = model and model:FindFirstChild("Sign")
-	local billboard = sign and sign:FindFirstChildOfClass("BillboardGui")
-	if billboard then
-		billboard.Enabled = visible
-	end
-end
-
 local function updateCamera()
 	local model = if inGame() then tableModel() else nil
 	if model == seatedTable then
 		return
 	end
-	setSign(seatedTable, true)
 	seatedTable = model
 	if model and state then
-		setSign(model, false)
 		local cf = model.WorldPivot
 		-- A fixed shot from across the table, like the video: both players and both sheets.
 		local eye = cf:PointToWorldSpace(Vector3.new(0, Config.TABLE_TOP + 5.2, -6.6))
@@ -191,6 +183,7 @@ stateEvent.OnClientEvent:Connect(function(newState: { [string]: any })
 	updateCamera()
 	renderBells()
 	Hud.update(state, Config.BELLS)
+	JoinPrompt.setHidden(state ~= nil)
 	if state and state.phase == "battle" then
 		onStrike(previous)
 	end

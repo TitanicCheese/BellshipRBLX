@@ -11,8 +11,10 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Stats = require(script.Parent.Stats)
 local TableBuilder = require(script.Parent.TableBuilder)
 
-type Seated = { player: Player?, humanoid: Humanoid, name: string }
 type Strike = { by: number, key: string, hit: boolean }
+-- Called with the waiting player when a table opens up for joining, or nil when it closes.
+export type Seated = { player: Player?, humanoid: Humanoid, name: string }
+export type Announce = (id: number, waiting: Seated?) -> ()
 
 local Match = {}
 Match.__index = Match
@@ -21,6 +23,8 @@ export type Match = typeof(setmetatable(
 	{} :: {
 		refs: TableBuilder.Refs,
 		state: RemoteEvent,
+		announce: Announce,
+		announced: Seated?, -- who the server was last told is waiting here
 		seats: { [number]: Seated? },
 		participants: { [number]: Seated }?,
 		phase: string,
@@ -57,10 +61,12 @@ local function playSound(parent: Instance, id: string, volume: number, speed: nu
 	Debris:AddItem(sound, 7)
 end
 
-function Match.new(refs: TableBuilder.Refs, state: RemoteEvent): Match
+function Match.new(refs: TableBuilder.Refs, state: RemoteEvent, announce: Announce): Match
 	local self = setmetatable({
 		refs = refs,
 		state = state,
+		announce = announce,
+		announced = nil,
 		seats = {},
 		participants = nil,
 		phase = "idle",
@@ -457,25 +463,14 @@ function Match.view(self: Match, side: number): { [string]: any }
 	}
 end
 
+-- Shows the "1/2" badge while one player waits, and tells everyone in the server about it so
+-- they can join from the prompt.
 function Match.updateSign(self: Match)
-	local status = self.refs.status
-	local a, b = self.seats[1], self.seats[2]
-	local p = self.participants
-	if self.phase == "idle" then
-		status.Text = "Open · sit down to play"
-		status.TextColor3 = Color3.fromRGB(160, 255, 160)
-	elseif self.phase == "waiting" then
-		status.Text = "1/2 · waiting for an opponent"
-		status.TextColor3 = Color3.fromRGB(255, 225, 120)
-	elseif self.phase == "over" and p then
-		status.Text = p[self.winner :: number].name .. " wins!"
-		status.TextColor3 = Color3.fromRGB(255, 225, 120)
-	elseif a and b then
-		status.Text = string.format("%s %d 🛎️ vs 🛎️ %d %s", a.name, self:alive(1), self:alive(2), b.name)
-		if self.phase == "placing" then
-			status.Text = a.name .. " vs " .. b.name .. " · placing bells"
-		end
-		status.TextColor3 = Color3.new(1, 1, 1)
+	local waiting = if self.phase == "waiting" then self.seats[1] or self.seats[2] else nil
+	self.refs.sign.Enabled = waiting ~= nil
+	if waiting ~= self.announced then
+		self.announced = waiting
+		self.announce(self.refs.id, waiting)
 	end
 end
 

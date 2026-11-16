@@ -1,5 +1,5 @@
 -- Builds one game table: a black table with two paper sheets side by side, a divider
--- between them, two chairs on the same side, and a floating sign.
+-- between them, two chairs on the same side, and a "1/2" badge.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ChairModel = require(script.Parent.ChairModel)
@@ -14,7 +14,7 @@ export type Refs = {
 	seats: { Seat },
 	tiles: { { [string]: BasePart } },
 	markers: Folder,
-	title: TextLabel,
+	sign: BillboardGui,
 	status: TextLabel,
 }
 
@@ -353,10 +353,11 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 
 	local seats = { chair(1, cf, model), chair(2, cf, model) }
 
+	-- A small "1/2" badge over the table, shown by Match only while one player is waiting.
 	local anchor = block(
 		"Sign",
 		Vector3.new(0.2, 0.2, 0.2),
-		cf * CFrame.new(0, top + 7, 0.75),
+		cf * CFrame.new(0, top + 5.6, 0.75),
 		BLACK,
 		Enum.Material.SmoothPlastic,
 		model
@@ -364,30 +365,21 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 	anchor.Transparency = 1
 	anchor.CanCollide = false
 	anchor.CanQuery = false
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromOffset(240, 70)
-	billboard.MaxDistance = 80
-	billboard.Parent = anchor
-	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.BackgroundTransparency = 1
-	title.Size = UDim2.fromScale(1, 0.55)
-	title.Font = Enum.Font.FredokaOne
-	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(255, 236, 170)
-	title.TextStrokeTransparency = 0.4
-	title.Text = "Table " .. id
-	title.Parent = billboard
+	local sign = Instance.new("BillboardGui")
+	sign.Size = UDim2.fromOffset(84, 48)
+	sign.MaxDistance = 90
+	sign.Enabled = false
+	sign.Parent = anchor
 	local status = Instance.new("TextLabel")
 	status.Name = "Status"
 	status.BackgroundTransparency = 1
-	status.Position = UDim2.fromScale(0, 0.55)
-	status.Size = UDim2.fromScale(1, 0.4)
-	status.Font = Enum.Font.GothamBold
+	status.Size = UDim2.fromScale(1, 1)
+	status.Font = Enum.Font.FredokaOne
 	status.TextScaled = true
-	status.TextColor3 = Color3.new(1, 1, 1)
-	status.TextStrokeTransparency = 0.4
-	status.Parent = billboard
+	status.TextColor3 = Color3.fromRGB(255, 225, 120)
+	status.TextStrokeTransparency = 0.3
+	status.Text = "1/2"
+	status.Parent = sign
 
 	model.WorldPivot = cf
 	model.Parent = parent
@@ -398,7 +390,7 @@ function TableBuilder.build(id: number, cf: CFrame, parent: Instance): Refs
 		seats = seats,
 		tiles = tiles,
 		markers = markers,
-		title = title,
+		sign = sign,
 		status = status,
 	}
 end
