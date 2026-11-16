@@ -1,6 +1,6 @@
--- The Rewards Hub: a gift button and your dollars on the left of the screen, and a big colourful
--- panel with tabs for crates, your skins, and each kind of reward (playtime, weekly, VIP, daily,
--- invites, Robux spent, group). The server decides what can be claimed and what a crate gives;
+-- The Rewards Hub, crates and your skins: your dollars and three buttons (Rewards, Crates,
+-- Skins) on the left of the screen. Each opens the same colourful panel; Rewards has a tab for
+-- each kind of reward (playtime, weekly, VIP, daily, invites, Robux spent, group). The server decides what can be claimed and what a crate gives;
 -- this just shows it. Crates open with a simple reveal, and their odds are listed openly.
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -15,6 +15,7 @@ local RewardsHub = {}
 
 local player = Players.LocalPlayer
 local money = RewardsConfig.money
+local ROBUX = RewardsConfig.ROBUX_ICON
 
 local FONT = Enum.Font.FredokaOne
 local WHITE = Color3.new(1, 1, 1)
@@ -160,12 +161,12 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = 5
 
--- Left side: your dollars and the gift button.
+-- Left side: your dollars and the Rewards, Crates and Skins buttons.
 local side = Instance.new("Frame")
 side.BackgroundTransparency = 1
 side.AnchorPoint = Vector2.new(0, 0.5)
 side.Position = UDim2.new(0, 14, 0.5, 0)
-side.Size = UDim2.fromOffset(170, 190)
+side.Size = UDim2.fromOffset(170, 58 + 3 * 112)
 side.Parent = gui
 
 local cashPill = Instance.new("Frame")
@@ -181,25 +182,32 @@ local cashLabel = text(cashPill, "$0", {
 	StrokeThickness = 2.5,
 })
 
-local openButton = Instance.new("TextButton")
-openButton.Position = UDim2.fromOffset(25, 60)
-openButton.Size = UDim2.fromOffset(120, 120)
-openButton.BackgroundColor3 = ORANGE
-openButton.Text = ""
-openButton.AutoButtonColor = true
-openButton.Parent = side
-corner(openButton, 24)
-gradient(openButton, Color3.fromRGB(255, 200, 70), Color3.fromRGB(255, 90, 20))
-stroke(openButton, INK, 4)
-text(openButton, "🎁", { Position = UDim2.fromOffset(20, 8), Size = UDim2.fromOffset(80, 70) })
-text(openButton, "Rewards", {
-	Position = UDim2.fromOffset(6, 80),
-	Size = UDim2.fromOffset(108, 32),
-	StrokeThickness = 2.5,
-})
-local openDot = dot(openButton)
-openDot.Size = UDim2.fromOffset(28, 28)
-corner(openDot, 14)
+local function sideButton(index: number, icon: string, label: string, top: Color3, bottom: Color3): (TextButton, Frame)
+	local b = Instance.new("TextButton")
+	b.Position = UDim2.fromOffset(35, 58 + (index - 1) * 112)
+	b.Size = UDim2.fromOffset(100, 100)
+	b.BackgroundColor3 = WHITE
+	b.Text = ""
+	b.AutoButtonColor = true
+	b.Parent = side
+	corner(b, 22)
+	gradient(b, top, bottom)
+	stroke(b, INK, 4)
+	text(b, icon, { Position = UDim2.fromOffset(20, 6), Size = UDim2.fromOffset(60, 56) })
+	text(b, label, {
+		Position = UDim2.fromOffset(4, 64),
+		Size = UDim2.fromOffset(92, 28),
+		StrokeThickness = 2.5,
+	})
+	local d = dot(b)
+	d.Size = UDim2.fromOffset(26, 26)
+	corner(d, 13)
+	return b, d
+end
+local openButton, openDot = sideButton(1, "🎁", "Rewards", Color3.fromRGB(255, 200, 70), Color3.fromRGB(255, 90, 20))
+local cratesButton, cratesDot =
+	sideButton(2, "📦", "Crates", Color3.fromRGB(255, 110, 120), Color3.fromRGB(200, 30, 60))
+local skinsButton = sideButton(3, "🎨", "Skins", Color3.fromRGB(255, 140, 240), Color3.fromRGB(170, 50, 200))
 
 -- The hub panel.
 local holder = Instance.new("Frame")
@@ -267,7 +275,7 @@ content.Position = UDim2.fromOffset(TAB_W + 34, 18)
 content.Size = UDim2.fromOffset(PANEL_W - TAB_W - 52, PANEL_H - 36)
 content.Parent = panel
 corner(content, 16)
-local CONTENT_W = PANEL_W - TAB_W - 52
+local CONTENT_W = PANEL_W - TAB_W - 52 -- changes with the panel's mode (see layout)
 
 local header = text(content, "", {
 	Position = UDim2.fromOffset(16, 10),
@@ -287,6 +295,24 @@ scroll.ScrollBarThickness = 8
 scroll.ScrollBarImageColor3 = WHITE
 scroll.Parent = content
 local ROW_W = CONTENT_W - 40
+
+-- What the panel shows: the rewards (with tabs), the crates, or your skins (without tabs).
+type Mode = "Rewards" | "Crates" | "Skins"
+local mode: Mode = "Rewards"
+local TITLES = { Rewards = "REWARDS HUB 🎁", Crates = "CRATES 📦", Skins = "MY SKINS 🎨" }
+
+local function applyMode()
+	local full = mode ~= "Rewards"
+	tabList.Visible = not full
+	local x = if full then 18 else TAB_W + 34
+	CONTENT_W = PANEL_W - x - 18
+	ROW_W = CONTENT_W - 40
+	content.Position = UDim2.fromOffset(x, 18)
+	content.Size = UDim2.fromOffset(CONTENT_W, PANEL_H - 36)
+	header.Size = UDim2.fromOffset(CONTENT_W - 32, 44)
+	scroll.Size = UDim2.fromOffset(CONTENT_W - 20, PANEL_H - 36 - 72)
+	title.Text = TITLES[mode]
+end
 
 local function clear()
 	for _, child in scroll:GetChildren() do
@@ -737,11 +763,11 @@ end
 
 renderers.Robux = function(s)
 	local spent = s.robuxSpent :: number
-	header.Text = "You've spent R$" .. spent .. " in Bellship!"
+	header.Text = "You've spent " .. ROBUX .. spent .. " in Bellship!"
 	local claimed = s.robuxClaimed :: { number }
 	for i, tier in RewardsConfig.ROBUX do
 		local r = row(120, TAB_COLORS.Robux)
-		leftLabel(r, "R$\n" .. tier.robux)
+		leftLabel(r, ROBUX .. "\n" .. tier.robux)
 		cashTile(r, tier.cash, 135, 100)
 		-- Progress towards this tier.
 		local bar = Instance.new("Frame")
@@ -764,7 +790,7 @@ renderers.Robux = function(s)
 				claim("Robux", i)
 			end)
 		else
-			claimButton(r, "waiting", "R$" .. tier.robux - spent .. " to go")
+			claimButton(r, "waiting", ROBUX .. tier.robux - spent .. " to go")
 		end
 	end
 end
@@ -829,7 +855,10 @@ renderers.Crates = function(s)
 			{ label = "Open " .. money(crate.price), color = Color3.fromRGB(60, 210, 80), how = "cash" }
 		)
 		if crate.robuxProductId ~= 0 and s.robuxCrates then
-			table.insert(buttons, { label = "Open with R$", color = Color3.fromRGB(20, 200, 180), how = "robux" })
+			table.insert(
+				buttons,
+				{ label = "Open with " .. ROBUX, color = Color3.fromRGB(20, 200, 180), how = "robux" }
+			)
 		end
 		local h = math.min(44, (150 - 16 - (#buttons - 1) * 6) / #buttons)
 		for i, info in buttons do
@@ -919,7 +948,7 @@ renderers.Skins = function(s)
 		local grid = Instance.new("Frame")
 		grid.LayoutOrder = order
 		grid.BackgroundTransparency = 1
-		grid.Size = UDim2.fromOffset(ROW_W, math.ceil(#mine / 4) * 132)
+		grid.Size = UDim2.fromOffset(ROW_W, math.ceil(#mine / math.max(1, (ROW_W + 10) // 134)) * 132)
 		grid.Parent = scroll
 		local layout = Instance.new("UIGridLayout")
 		layout.CellSize = UDim2.fromOffset(124, 122)
@@ -1007,8 +1036,10 @@ local function render()
 			unlocked += 1
 		end
 	end
-	local key = string.format("%s|%d|%d|%s", activeTab, version, unlocked, tostring(holder.Visible))
+	local page = if mode == "Rewards" then activeTab else mode
+	local key = string.format("%s|%d|%d|%s", page, version, unlocked, tostring(holder.Visible))
 	local any = false
+	cratesDot.Visible = ready.Crates == true
 	for id, tab in tabButtons do
 		tab.dot.Visible = ready[id] == true
 		any = any or ready[id] == true
@@ -1025,7 +1056,7 @@ local function render()
 		clear()
 		order = 0
 		tickers = {}
-		renderers[activeTab](s)
+		renderers[page](s)
 	else
 		for _, update in tickers do
 			update()
@@ -1056,6 +1087,8 @@ end
 local function setOpen(open: boolean)
 	holder.Visible = open
 	if open then
+		applyMode()
+		scroll.CanvasPosition = Vector2.zero
 		fit()
 		local scale = uiScale.Scale
 		uiScale.Scale = scale * 0.85
@@ -1064,13 +1097,33 @@ local function setOpen(open: boolean)
 	end
 end
 
+-- Each side button opens the panel in its mode, or closes it if that mode is already open.
+local function toggle(which: Mode)
+	if holder.Visible and mode == which then
+		setOpen(false)
+	else
+		mode = which
+		setOpen(true)
+	end
+end
 openButton.Activated:Connect(function()
-	setOpen(not holder.Visible)
+	toggle("Rewards")
 end)
--- For testing from Studio: set the ScreenGui's "Tab" attribute to open the hub on that tab.
+cratesButton.Activated:Connect(function()
+	toggle("Crates")
+end)
+skinsButton.Activated:Connect(function()
+	toggle("Skins")
+end)
+-- For testing from Studio: set the ScreenGui's "Tab" attribute to open the panel on a rewards
+-- tab, or on "Crates" / "Skins".
 gui:GetAttributeChangedSignal("Tab"):Connect(function()
 	local tab = gui:GetAttribute("Tab")
-	if typeof(tab) == "string" and renderers[tab] then
+	if tab == "Crates" or tab == "Skins" then
+		mode = tab
+		setOpen(true)
+	elseif typeof(tab) == "string" and renderers[tab] then
+		mode = "Rewards"
 		activeTab = tab
 		setOpen(true)
 	end

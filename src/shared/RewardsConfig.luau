@@ -99,16 +99,17 @@ RewardsConfig.ROBUX = {
 -- Once, for being in the group.
 RewardsConfig.GROUP = 1500
 
--- The hub's tabs, top to bottom.
+-- Roblox's Robux icon, as a character any text can show. Put it wherever Robux is mentioned.
+RewardsConfig.ROBUX_ICON = "\u{E002}"
+
+-- The Rewards Hub's tabs, top to bottom. Crates and skins have their own buttons.
 RewardsConfig.TABS = {
-	{ id = "Crates", title = "Crates", color = Color3.fromRGB(230, 70, 90) },
-	{ id = "Skins", title = "My Skins", color = Color3.fromRGB(240, 100, 220) },
 	{ id = "Playtime", title = "Playtime\nRewards", color = Color3.fromRGB(40, 170, 255) },
 	{ id = "Weekly", title = "Weekly\nRewards", color = Color3.fromRGB(160, 90, 255) },
 	{ id = "Vip", title = "VIP Daily\nReward", color = Color3.fromRGB(255, 185, 30) },
 	{ id = "Daily", title = "Daily\nRewards", color = Color3.fromRGB(60, 210, 90) },
 	{ id = "Invite", title = "Invite\nFriends", color = Color3.fromRGB(255, 90, 170) },
-	{ id = "Robux", title = "Robux Spent\nRewards", color = Color3.fromRGB(20, 200, 180) },
+	{ id = "Robux", title = "\u{E002} Robux Spent\nRewards", color = Color3.fromRGB(20, 200, 180) },
 	{ id = "Group", title = "Like + Join\nGroup Reward", color = Color3.fromRGB(255, 110, 50) },
 }
 
