@@ -1,5 +1,5 @@
--- The Rewards Hub, crates and your skins: your dollars and three buttons (Rewards, Crates,
--- Skins) on the left of the screen. Each opens the same colourful panel; Rewards has a tab for
+-- The Rewards Hub, daily quests, crates and your skins: your dollars and four buttons
+-- (Rewards, Quests, Crates, Skins) on the left of the screen. Each opens the same colourful panel; Rewards has a tab for
 -- each kind of reward (playtime, weekly, VIP, daily, invites, Robux spent, group). The server decides what can be claimed and what a crate gives;
 -- this just shows it. Crates open with a simple reveal, and their odds are listed openly.
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -166,7 +166,7 @@ local side = Instance.new("Frame")
 side.BackgroundTransparency = 1
 side.AnchorPoint = Vector2.new(0, 0.5)
 side.Position = UDim2.new(0, 14, 0.5, 0)
-side.Size = UDim2.fromOffset(170, 58 + 3 * 112)
+side.Size = UDim2.fromOffset(170, 58 + 4 * 112)
 side.Parent = gui
 
 local cashPill = Instance.new("Frame")
@@ -205,9 +205,11 @@ local function sideButton(index: number, icon: string, label: string, top: Color
 	return b, d
 end
 local openButton, openDot = sideButton(1, "🎁", "Rewards", Color3.fromRGB(255, 200, 70), Color3.fromRGB(255, 90, 20))
+local questsButton, questsDot =
+	sideButton(2, "📜", "Quests", Color3.fromRGB(120, 230, 255), Color3.fromRGB(30, 120, 230))
 local cratesButton, cratesDot =
-	sideButton(2, "📦", "Crates", Color3.fromRGB(255, 110, 120), Color3.fromRGB(200, 30, 60))
-local skinsButton = sideButton(3, "🎨", "Skins", Color3.fromRGB(255, 140, 240), Color3.fromRGB(170, 50, 200))
+	sideButton(3, "📦", "Crates", Color3.fromRGB(255, 110, 120), Color3.fromRGB(200, 30, 60))
+local skinsButton = sideButton(4, "🎨", "Skins", Color3.fromRGB(255, 140, 240), Color3.fromRGB(170, 50, 200))
 
 -- The hub panel.
 local holder = Instance.new("Frame")
@@ -297,9 +299,10 @@ scroll.Parent = content
 local ROW_W = CONTENT_W - 40
 
 -- What the panel shows: the rewards (with tabs), the crates, or your skins (without tabs).
-type Mode = "Rewards" | "Crates" | "Skins"
+type Mode = "Rewards" | "Quests" | "Crates" | "Skins"
 local mode: Mode = "Rewards"
-local TITLES = { Rewards = "REWARDS HUB 🎁", Crates = "CRATES 📦", Skins = "MY SKINS 🎨" }
+local TITLES =
+	{ Rewards = "REWARDS HUB 🎁", Quests = "DAILY QUESTS 📜", Crates = "CRATES 📦", Skins = "MY SKINS 🎨" }
 
 local function applyMode()
 	local full = mode ~= "Rewards"
@@ -927,6 +930,87 @@ renderers.Crates = function(s)
 	note("Already own it? You get half its price back in dollars.", Color3.fromRGB(200, 220, 255))
 end
 
+renderers.Quests = function(s)
+	tick(function()
+		header.Text = "New quests in " .. untilTime(s.dayEnds)
+	end)
+	local questColor = Color3.fromRGB(40, 140, 230)
+	local claimedCount = 0
+	for i, quest in s.quests do
+		local r = row(110, if quest.everyDay then Color3.fromRGB(230, 150, 30) else questColor)
+		text(r, quest.icon, {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 14, 0.5, 0),
+			Size = UDim2.fromOffset(62, 62),
+		})
+		text(r, quest.text, {
+			Position = UDim2.fromOffset(88, 12),
+			Size = UDim2.fromOffset(ROW_W - 88 - 290, 34),
+			TextXAlignment = Enum.TextXAlignment.Left,
+		})
+		if quest.everyDay then
+			text(r, "⭐ Every day", {
+				Position = UDim2.fromOffset(88, 48),
+				Size = UDim2.fromOffset(160, 20),
+				TextColor3 = Color3.fromRGB(255, 240, 160),
+				TextXAlignment = Enum.TextXAlignment.Left,
+			})
+		end
+		-- Progress bar.
+		local bar = Instance.new("Frame")
+		bar.Position = UDim2.fromOffset(88, 74)
+		bar.Size = UDim2.fromOffset(ROW_W - 88 - 290, 22)
+		bar.BackgroundColor3 = Color3.fromRGB(20, 30, 50)
+		bar.Parent = r
+		corner(bar, 11)
+		stroke(bar, INK, 2)
+		local fill = Instance.new("Frame")
+		fill.Size = UDim2.fromScale(math.clamp(quest.progress / quest.target, 0, 1), 1)
+		fill.BackgroundColor3 = Color3.fromRGB(120, 255, 110)
+		fill.Parent = bar
+		corner(fill, 11)
+		text(bar, quest.progress .. " / " .. quest.target, {
+			Size = UDim2.fromScale(1, 1),
+			StrokeThickness = 2,
+		})
+		cashTile(r, quest.cash, ROW_W - 280, 92)
+		if quest.claimed then
+			claimedCount += 1
+			claimButton(r, "claimed", "Claimed ✓")
+		elseif quest.progress >= quest.target then
+			claimButton(r, "ready", "Claim!", function()
+				claim("Quest", i)
+			end)
+		else
+			claimButton(r, "waiting", "In progress")
+		end
+	end
+	-- Bonus crate for finishing them all.
+	local r = row(120, Color3.fromRGB(150, 70, 230))
+	text(r, "Finish all " .. #s.quests .. " quests", {
+		Position = UDim2.fromOffset(20, 18),
+		Size = UDim2.fromOffset(ROW_W - 20 - 300, 40),
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	text(r, claimedCount .. " / " .. #s.quests .. " claimed", {
+		Position = UDim2.fromOffset(20, 66),
+		Size = UDim2.fromOffset(ROW_W - 20 - 300, 28),
+		TextColor3 = Color3.fromRGB(255, 240, 160),
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	crateTile(r, s.questBonusCrate, ROW_W - 280, 100)
+	if s.questBonus then
+		claimButton(r, "claimed", "Claimed ✓")
+	elseif claimedCount >= #s.quests then
+		claimButton(r, "ready", "Claim!", function()
+			claim("QuestBonus")
+		end)
+	else
+		claimButton(r, "waiting", "Locked")
+	end
+	note("Only games against other players count.", Color3.fromRGB(200, 220, 255))
+end
+
 renderers.Skins = function(s)
 	header.Text = "Your skins"
 	local owned = s.owned :: { string }
@@ -1016,6 +1100,18 @@ local function claimable(s: { [string]: any }): { [string]: boolean }
 			result.Crates = true
 		end
 	end
+	local allClaimed = true
+	for _, quest in s.quests do
+		if not quest.claimed then
+			allClaimed = false
+			if quest.progress >= quest.target then
+				result.Quests = true
+			end
+		end
+	end
+	if allClaimed and not s.questBonus then
+		result.Quests = true
+	end
 	return result
 end
 
@@ -1040,6 +1136,7 @@ local function render()
 	local key = string.format("%s|%d|%d|%s", page, version, unlocked, tostring(holder.Visible))
 	local any = false
 	cratesDot.Visible = ready.Crates == true
+	questsDot.Visible = ready.Quests == true
 	for id, tab in tabButtons do
 		tab.dot.Visible = ready[id] == true
 		any = any or ready[id] == true
@@ -1109,6 +1206,9 @@ end
 openButton.Activated:Connect(function()
 	toggle("Rewards")
 end)
+questsButton.Activated:Connect(function()
+	toggle("Quests")
+end)
 cratesButton.Activated:Connect(function()
 	toggle("Crates")
 end)
@@ -1116,10 +1216,10 @@ skinsButton.Activated:Connect(function()
 	toggle("Skins")
 end)
 -- For testing from Studio: set the ScreenGui's "Tab" attribute to open the panel on a rewards
--- tab, or on "Crates" / "Skins".
+-- tab, or on "Quests" / "Crates" / "Skins". The tracker's "Minimized" attribute folds it.
 gui:GetAttributeChangedSignal("Tab"):Connect(function()
 	local tab = gui:GetAttribute("Tab")
-	if tab == "Crates" or tab == "Skins" then
+	if tab == "Quests" or tab == "Crates" or tab == "Skins" then
 		mode = tab
 		setOpen(true)
 	elseif typeof(tab) == "string" and renderers[tab] then
@@ -1132,15 +1232,141 @@ close.Activated:Connect(function()
 	setOpen(false)
 end)
 
+-- Quest tracker: today's quests as text in the top right, always on screen (also while seated).
+-- The ▼ button folds it down to just its title; tapping the title opens the quests panel.
+local trackerGui = Instance.new("ScreenGui")
+trackerGui.Name = "QuestTracker"
+trackerGui.ResetOnSpawn = false
+trackerGui.DisplayOrder = 4
+
+local tracker = Instance.new("Frame")
+tracker.AnchorPoint = Vector2.new(1, 0)
+tracker.Position = UDim2.new(1, -14, 0, 10)
+tracker.Size = UDim2.fromOffset(270, 0)
+tracker.AutomaticSize = Enum.AutomaticSize.Y
+tracker.BackgroundColor3 = Color3.fromRGB(16, 14, 40)
+tracker.BackgroundTransparency = 0.35
+tracker.Parent = trackerGui
+corner(tracker, 12)
+stroke(tracker, INK, 2)
+local trackerPad = Instance.new("UIPadding")
+trackerPad.PaddingTop = UDim.new(0, 6)
+trackerPad.PaddingBottom = UDim.new(0, 8)
+trackerPad.PaddingLeft = UDim.new(0, 10)
+trackerPad.PaddingRight = UDim.new(0, 8)
+trackerPad.Parent = tracker
+local trackerLayout = Instance.new("UIListLayout")
+trackerLayout.Padding = UDim.new(0, 3)
+trackerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+trackerLayout.Parent = tracker
+
+local trackerTop = Instance.new("Frame")
+trackerTop.BackgroundTransparency = 1
+trackerTop.Size = UDim2.new(1, 0, 0, 26)
+trackerTop.LayoutOrder = 0
+trackerTop.Parent = tracker
+local trackerTitle = Instance.new("TextButton")
+trackerTitle.BackgroundTransparency = 1
+trackerTitle.Size = UDim2.new(1, -34, 1, 0)
+trackerTitle.Font = FONT
+trackerTitle.TextScaled = true
+trackerTitle.TextXAlignment = Enum.TextXAlignment.Left
+trackerTitle.TextColor3 = Color3.fromRGB(255, 210, 60)
+trackerTitle.Text = "📜 Daily Quests"
+trackerTitle.Parent = trackerTop
+stroke(trackerTitle, INK, 2, true)
+local minimize = button(trackerTop, "−", Color3.fromRGB(80, 90, 140), {
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.fromScale(1, 0),
+	Size = UDim2.fromOffset(28, 26),
+})
+minimize.Name = "Minimize"
+local minimizePad = minimize:FindFirstChildOfClass("UIPadding")
+if minimizePad then
+	minimizePad:Destroy()
+end
+
+local trackerLines = Instance.new("Frame")
+trackerLines.BackgroundTransparency = 1
+trackerLines.Size = UDim2.fromScale(1, 0)
+trackerLines.AutomaticSize = Enum.AutomaticSize.Y
+trackerLines.LayoutOrder = 1
+trackerLines.Parent = tracker
+local linesLayout = Instance.new("UIListLayout")
+linesLayout.Padding = UDim.new(0, 2)
+linesLayout.SortOrder = Enum.SortOrder.LayoutOrder
+linesLayout.Parent = trackerLines
+
+local trackerVersion = -1
+local function renderTracker()
+	local s = state
+	if not s or trackerVersion == version then
+		return
+	end
+	trackerVersion = version
+	for _, child in trackerLines:GetChildren() do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	local lines = {}
+	for _, quest in s.quests do
+		local done = quest.progress >= quest.target
+		local status = if quest.claimed
+			then "✓"
+			elseif done then "Claim!"
+			else math.min(quest.progress, quest.target) .. "/" .. quest.target
+		table.insert(lines, {
+			value = quest.icon .. " " .. quest.text .. "  " .. status,
+			color = if quest.claimed
+				then Color3.fromRGB(140, 150, 170)
+				elseif done then Color3.fromRGB(120, 255, 110)
+				else WHITE,
+		})
+	end
+	if s.questBonus then
+		table.insert(lines, { value = "🎉 All done! New quests tomorrow", color = Color3.fromRGB(255, 210, 60) })
+	end
+	for i, line in lines do
+		text(trackerLines, line.value, {
+			LayoutOrder = i,
+			Size = UDim2.new(1, 0, 0, 20),
+			TextColor3 = line.color,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			StrokeThickness = 1.5,
+		})
+	end
+end
+
+local function setTrackerMinimized(minimized: boolean)
+	trackerLines.Visible = not minimized
+	minimize.Text = if minimized then "+" else "−"
+	trackerGui:SetAttribute("Minimized", minimized)
+end
+minimize.Activated:Connect(function()
+	setTrackerMinimized(trackerLines.Visible)
+end)
+trackerGui:GetAttributeChangedSignal("Minimized"):Connect(function()
+	local minimized = trackerGui:GetAttribute("Minimized") == true
+	if minimized == trackerLines.Visible then
+		setTrackerMinimized(minimized)
+	end
+end)
+trackerTitle.Activated:Connect(function()
+	toggle("Quests")
+end)
+
 function RewardsHub.start(remote: RemoteFunction, event: RemoteEvent)
 	rewardsFunction = remote
 	gui.Parent = player:WaitForChild("PlayerGui")
+	trackerGui.Parent = gui.Parent
 	event.OnClientEvent:Connect(function(snapshot: { [string]: any }?, message: string?, opened: { [string]: any }?)
 		if snapshot then
 			state = snapshot
 			receivedAt = os.clock()
 			version += 1
 			cashLabel.Text = money(snapshot.cash)
+			renderTracker()
 			render()
 		end
 		if message then
@@ -1157,6 +1383,7 @@ function RewardsHub.start(remote: RemoteFunction, event: RemoteEvent)
 			receivedAt = os.clock()
 			version += 1
 			cashLabel.Text = money(snapshot.cash)
+			renderTracker()
 			render()
 		end
 	end)

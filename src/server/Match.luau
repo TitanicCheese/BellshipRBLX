@@ -314,6 +314,7 @@ function Match.strike(self: Match, side: number, key: string)
 	self.struck[side][key] = if hit then "hit" else "miss"
 	if hit then
 		Stats.rang(self:rankedPlayer(side))
+		Economy.quest(self:rankedPlayer(side), "rang")
 		Economy.addCash(self:rankedPlayer(side), RewardsConfig.CASH_PER_BELL)
 	end
 	self.last = { by = side, key = key, hit = hit }
@@ -398,6 +399,28 @@ function Match.showStrike(self: Match, target: number, key: string, hit: boolean
 	end
 end
 
+-- Daily quests for a game played to the end between two players.
+function Match.countQuests(self: Match, winner: number)
+	local a, b = self:rankedPlayer(1), self:rankedPlayer(2)
+	if not a or not b then
+		return
+	end
+	Economy.quest(a, "played")
+	Economy.quest(b, "played")
+	local champion = self:rankedPlayer(winner)
+	Economy.quest(champion, "won")
+	if self:alive(winner) == Config.BELLS then
+		Economy.quest(champion, "flawless")
+	end
+	task.spawn(function()
+		local ok, friends = pcall(a.IsFriendsWith, a, b.UserId)
+		if ok and friends then
+			Economy.quest(a, "friend")
+			Economy.quest(b, "friend")
+		end
+	end)
+end
+
 function Match.finish(self: Match, winner: number, reason: string)
 	self.token += 1
 	self.phase = "over"
@@ -408,6 +431,7 @@ function Match.finish(self: Match, winner: number, reason: string)
 	if reason == "bells" then
 		Stats.won(self:rankedPlayer(winner))
 		Economy.addCash(self:rankedPlayer(winner), RewardsConfig.CASH_PER_WIN)
+		self:countQuests(winner)
 	end
 	Stats.lost(self:rankedPlayer(other(winner)))
 	-- Show where the winner's surviving bells were.

@@ -41,6 +41,10 @@ type Data = {
 	Pity: { [string]: number }, -- opens of each crate kind since the last Epic or better
 	EquippedBell: string, -- "" for the regular one; the chair skin lives in Stats
 	EquippedBoard: string,
+	QuestDay: number, -- the day the quest progress below is for
+	QuestProgress: { [string]: number }, -- per stat (rang, won, played, flawless, friend)
+	QuestClaimed: { string }, -- quest ids claimed that day
+	QuestBonus: boolean, -- the all-quests crate claimed that day
 }
 -- restricted: PolicyService says paid random items are restricted for this player.
 type Entry = { data: Data, loaded: boolean, dirty: boolean, vip: boolean?, restricted: boolean }
@@ -76,16 +80,26 @@ local function newData(): Data
 		Pity = { Chair = 0, Bell = 0, Board = 0 },
 		EquippedBell = "",
 		EquippedBoard = "",
+		QuestDay = RewardsConfig.day(),
+		QuestProgress = {},
+		QuestClaimed = {},
+		QuestBonus = false,
 	}
 end
 
--- Starts a new day of playtime.
+-- Starts a new day of playtime and quests.
 local function rollDay(data: Data)
 	local today = RewardsConfig.day()
 	if data.PlayDay ~= today then
 		data.PlayDay = today
 		data.PlaySeconds = 0
 		data.PlayClaimed = {}
+	end
+	if data.QuestDay ~= today then
+		data.QuestDay = today
+		data.QuestProgress = {}
+		data.QuestClaimed = {}
+		data.QuestBonus = false
 	end
 end
 
@@ -132,6 +146,24 @@ local function snapshot(player: Player): { [string]: any }?
 		robuxCrates = not entry.restricted,
 		owned = table.clone(data.OwnedSkins),
 		equipped = { Chair = Stats.chairSkin(player), Bell = data.EquippedBell, Board = data.EquippedBoard },
+		quests = (function()
+			local list = {}
+			for _, quest in RewardsConfig.dailyQuests(today) do
+				table.insert(list, {
+					id = quest.id,
+					text = quest.text,
+					icon = quest.icon,
+					target = quest.target,
+					cash = quest.cash,
+					everyDay = quest.everyDay,
+					progress = math.min(quest.target, data.QuestProgress[quest.stat] or 0),
+					claimed = table.find(data.QuestClaimed, quest.id) ~= nil,
+				})
+			end
+			return list
+		end)(),
+		questBonus = data.QuestBonus,
+		questBonusCrate = RewardsConfig.questBonusCrate(today),
 	}
 end
 
@@ -197,6 +229,27 @@ function Economy.buy(player: Player, skin: ChairSkins.Skin): (boolean, string)
 	end)
 	push(player, "Bought " .. skin.name .. "!")
 	return true, ""
+end
+
+-- Counts towards today's quests: stat is rang, won, played, flawless or friend.
+function Economy.quest(player: Player?, stat: string, amount: number?)
+	local entry = player and entries[player]
+	if not player or not entry then
+		return
+	end
+	local data = entry.data
+	rollDay(data)
+	local before = data.QuestProgress[stat] or 0
+	data.QuestProgress[stat] = before + (amount or 1)
+	entry.dirty = true
+	-- Tell the player when a quest is finished.
+	local message = nil
+	for _, quest in RewardsConfig.dailyQuests(RewardsConfig.day()) do
+		if quest.stat == stat and before < quest.target and data.QuestProgress[stat] >= quest.target then
+			message = "Quest complete: " .. quest.text .. "!"
+		end
+	end
+	push(player, message)
 end
 
 -- Records Robux spent, for the Robux Spent Rewards tab.
@@ -289,6 +342,25 @@ local function claim(player: Player, tab: string, index: number?): string
 		end
 		table.insert(data.RobuxClaimed, index :: number)
 		amount = tier.cash
+	elseif tab == "Quest" then
+		local quest = index and RewardsConfig.dailyQuests(today)[index]
+		if not quest or table.find(data.QuestClaimed, quest.id) then
+			return "Already claimed"
+		end
+		if (data.QuestProgress[quest.stat] or 0) < quest.target then
+			return "Not finished yet"
+		end
+		table.insert(data.QuestClaimed, quest.id)
+		amount = quest.cash
+	elseif tab == "QuestBonus" then
+		if data.QuestBonus then
+			return "Already claimed"
+		end
+		if #data.QuestClaimed < #RewardsConfig.dailyQuests(today) then
+			return "Finish all of today's quests first"
+		end
+		data.QuestBonus = true
+		crate = RewardsConfig.questBonusCrate(today)
 	elseif tab == "Group" then
 		if RewardsConfig.GROUP_ID == 0 then
 			return "The group is coming soon"
@@ -310,6 +382,9 @@ local function claim(player: Player, tab: string, index: number?): string
 	entry.dirty = true
 	if crate and data.FreeCrates[crate] then
 		data.FreeCrates[crate] += 1
+		if amount == 0 then
+			return "A free " .. RewardsConfig.CRATES[crate].name .. "!"
+		end
 		return "+" .. RewardsConfig.money(amount) .. " and a free " .. RewardsConfig.CRATES[crate].name .. "!"
 	end
 	return "+" .. RewardsConfig.money(amount) .. "!"

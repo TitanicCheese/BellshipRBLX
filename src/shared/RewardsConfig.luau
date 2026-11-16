@@ -99,6 +99,91 @@ RewardsConfig.ROBUX = {
 -- Once, for being in the group.
 RewardsConfig.GROUP = 1500
 
+-- Daily quests: three a day, the same on every server, new at 00:00 UTC. "Play against a friend"
+-- is in every day's list; the other two are different kinds picked at random from below, each
+-- with a target picked for the day. Only games between two players count (not bots).
+export type Quest = {
+	id: string, -- unique for the day, e.g. "rang25"
+	stat: string, -- what counts: rang, won, played, flawless, friend
+	target: number,
+	cash: number,
+	text: string,
+	icon: string,
+	everyDay: boolean,
+}
+RewardsConfig.QUEST_FRIEND = { stat = "friend", target = 1, cash = 500, text = "Play against a friend", icon = "🤝" }
+RewardsConfig.QUEST_KINDS =
+	{
+		{
+			stat = "rang",
+			icon = "🛎️",
+			options = { { target = 15, cash = 400 }, { target = 25, cash = 600 }, { target = 40, cash = 900 } },
+			text = "Ring %d bells",
+		},
+		{
+			stat = "won",
+			icon = "🏆",
+			options = { { target = 1, cash = 300 }, { target = 2, cash = 500 }, { target = 3, cash = 800 } },
+			text = "Win %d games",
+			one = "Win a game",
+		},
+		{
+			stat = "played",
+			icon = "🎲",
+			options = { { target = 3, cash = 300 }, { target = 5, cash = 500 } },
+			text = "Play %d games",
+		},
+		{
+			stat = "flawless",
+			icon = "✨",
+			options = { { target = 1, cash = 700 } },
+			text = "Win %d games without losing a bell",
+			one = "Win without losing a bell",
+		},
+	} :: { { stat: string, icon: string, options: { { target: number, cash: number } }, text: string, one: string? } }
+RewardsConfig.QUESTS_PER_DAY = 3
+-- Finishing all of them unlocks a free crate (its kind changes each day).
+RewardsConfig.QUEST_BONUS_CRATES = { "Chair", "Bell", "Board" }
+
+-- The quests for a day.
+function RewardsConfig.dailyQuests(day: number): { Quest }
+	local rng = Random.new(day * 7919 + 17)
+	local quests: { Quest } = {}
+	local friend = RewardsConfig.QUEST_FRIEND
+	table.insert(quests, {
+		id = "friend1",
+		stat = friend.stat,
+		target = friend.target,
+		cash = friend.cash,
+		text = friend.text,
+		icon = friend.icon,
+		everyDay = true,
+	})
+	local kinds = table.clone(RewardsConfig.QUEST_KINDS)
+	for _ = 2, RewardsConfig.QUESTS_PER_DAY do
+		local kind = table.remove(kinds, rng:NextInteger(1, #kinds))
+		if not kind then
+			break
+		end
+		local option = kind.options[rng:NextInteger(1, #kind.options)]
+		table.insert(quests, {
+			id = kind.stat .. option.target,
+			stat = kind.stat,
+			target = option.target,
+			cash = option.cash,
+			text = if option.target == 1 and kind.one then kind.one else string.format(kind.text, option.target),
+			icon = kind.icon,
+			everyDay = false,
+		})
+	end
+	return quests
+end
+
+function RewardsConfig.questBonusCrate(day: number): string
+	local crates = RewardsConfig.QUEST_BONUS_CRATES
+	return crates[day % #crates + 1]
+end
+
 -- Roblox's Robux icon, as a character any text can show. Put it wherever Robux is mentioned.
 RewardsConfig.ROBUX_ICON = "\u{E002}"
 
