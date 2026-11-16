@@ -8,6 +8,9 @@ local TweenService = game:GetService("TweenService")
 
 local Bell = require(ReplicatedStorage.Shared.Bell)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Economy = require(script.Parent.Economy)
+local RewardsConfig = require(ReplicatedStorage.Shared.RewardsConfig)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 local Stats = require(script.Parent.Stats)
 local TableBuilder = require(script.Parent.TableBuilder)
 
@@ -311,6 +314,7 @@ function Match.strike(self: Match, side: number, key: string)
 	self.struck[side][key] = if hit then "hit" else "miss"
 	if hit then
 		Stats.rang(self:rankedPlayer(side))
+		Economy.addCash(self:rankedPlayer(side), RewardsConfig.CASH_PER_BELL)
 	end
 	self.last = { by = side, key = key, hit = hit }
 	self:showStrike(target, key, hit)
@@ -349,13 +353,19 @@ local function sparkle(parent: BasePart, color: Color3, count: number)
 	Debris:AddItem(emitter, 2)
 end
 
+-- The bell skin of whoever owns the bells on `side`.
+function Match.bellSkin(self: Match, side: number): string
+	local seated = (self.participants and self.participants[side]) or self.seats[side]
+	return Economy.equippedBell(seated and seated.player)
+end
+
 function Match.showStrike(self: Match, target: number, key: string, hit: boolean)
 	local tile = self.refs.tiles[target][key]
 	local cf = self:cellCFrame(target, key)
 	if hit then
 		-- The bell appears, its plunger snaps down and it rings. Then it is taken off the
 		-- sheet and the square gets a red X, like crossing it out with a marker.
-		local bell = Bell.build(cf, Config.BELL_SCALE)
+		local bell = Skins.buildBell(self:bellSkin(target), cf, Config.BELL_SCALE)
 		bell.Parent = self.refs.markers
 		local dome, stem, knob =
 			bell:FindFirstChild("Dome") :: Part,
@@ -397,12 +407,13 @@ function Match.finish(self: Match, winner: number, reason: string)
 	-- Only a game played to the last bell counts as a win; leaving still breaks your streak.
 	if reason == "bells" then
 		Stats.won(self:rankedPlayer(winner))
+		Economy.addCash(self:rankedPlayer(winner), RewardsConfig.CASH_PER_WIN)
 	end
 	Stats.lost(self:rankedPlayer(other(winner)))
 	-- Show where the winner's surviving bells were.
 	for key, alive in self.bells[winner] do
 		if alive then
-			local bell = Bell.build(self:cellCFrame(winner, key), Config.BELL_SCALE)
+			local bell = Skins.buildBell(self:bellSkin(winner), self:cellCFrame(winner, key), Config.BELL_SCALE)
 			bell.Parent = self.refs.markers
 			sparkle(bell:FindFirstChild("Dome") :: Part, Bell.SHINE, 12)
 		end

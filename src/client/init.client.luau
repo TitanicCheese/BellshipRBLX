@@ -9,12 +9,13 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Bell = require(Shared:WaitForChild("Bell"))
 local Config = require(Shared:WaitForChild("Config"))
+local Skins = require(Shared:WaitForChild("Skins"))
 local ChairShopClient = require(script.ChairShopClient)
 local Hud = require(script.Hud)
 local JoinPrompt = require(script.JoinPrompt)
 local LeaderboardYou = require(script.LeaderboardYou)
+local RewardsHub = require(script.RewardsHub)
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local stateEvent = remotes:WaitForChild("State") :: RemoteEvent
@@ -22,6 +23,7 @@ local actionEvent = remotes:WaitForChild("Action") :: RemoteEvent
 JoinPrompt.start(remotes:WaitForChild("Lobby") :: RemoteEvent, remotes:WaitForChild("Join") :: RemoteEvent)
 LeaderboardYou.start()
 ChairShopClient.start()
+RewardsHub.start(remotes:WaitForChild("Rewards") :: RemoteFunction, remotes:WaitForChild("RewardsState") :: RemoteEvent)
 local tables = workspace:WaitForChild("Tables")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -92,7 +94,8 @@ local function renderBells()
 		if alive then
 			local col, row = Config.parse(key)
 			local cf = model.WorldPivot * CFrame.new(Config.cellOffset(state.side, col :: number, row :: number))
-			Bell.build(cf, Config.BELL_SCALE).Parent = myBells
+			local skin = player:GetAttribute("EquippedBell")
+			Skins.buildBell(if typeof(skin) == "string" then skin else "", cf, Config.BELL_SCALE).Parent = myBells
 		end
 	end
 end
@@ -188,6 +191,7 @@ stateEvent.OnClientEvent:Connect(function(newState: { [string]: any })
 	renderBells()
 	Hud.update(state, Config.BELLS)
 	JoinPrompt.setHidden(state ~= nil)
+	RewardsHub.setHidden(state ~= nil)
 	if state and state.phase == "battle" then
 		onStrike(previous)
 	end

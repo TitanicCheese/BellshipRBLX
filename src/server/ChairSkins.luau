@@ -1,14 +1,19 @@
--- Chair skins: the catalog the shop rotates through, and swapping a table chair's look to the
--- skin of whoever sits in it. A skin only changes the visible parts; the Seat stays the same.
+-- Chair skins: the models for the chair entries of the shared skin catalog (shared/Skins), and
+-- swapping a table chair's look to the skin of whoever sits in it. A skin only changes the
+-- visible parts; the Seat stays the same.
 --
--- To add a real skin, give its entry a build function that returns a Model with its bottom
--- centre at `cf`, facing -Z with the back at +Z, sized like the regular chair at scale 1
--- (seat top 2.075 studs up). Every entry is a placeholder for now and builds the regular chair.
+-- To add a real skin, put a build function for its id in BUILDERS that returns a Model with its
+-- bottom centre at `cf`, facing -Z with the back at +Z, sized like the regular chair at scale 1
+-- (seat top 2.075 studs up). Skins without one are placeholders that build the regular chair.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local ChairModel = require(script.Parent.ChairModel)
+local RewardsConfig = require(ReplicatedStorage.Shared.RewardsConfig)
+local Skins = require(ReplicatedStorage.Shared.Skins)
 
 local ChairSkins = {}
 
-export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
+export type Rarity = Skins.Rarity
 export type Skin = {
 	id: string,
 	name: string,
@@ -16,27 +21,22 @@ export type Skin = {
 	build: (cf: CFrame, scale: number) -> Model,
 }
 
-ChairSkins.RARITY_COLORS = {
-	Common = Color3.fromRGB(190, 200, 212),
-	Rare = Color3.fromRGB(70, 160, 255),
-	Epic = Color3.fromRGB(190, 100, 255),
-	Legendary = Color3.fromRGB(255, 196, 40),
-}
+ChairSkins.RARITY_COLORS = RewardsConfig.RARITY_COLORS
 
 local function placeholder(cf: CFrame, scale: number): Model
 	return ChairModel.build(cf, scale)
 end
 
-local RARITIES: { Rarity } =
-	{ "Common", "Common", "Rare", "Common", "Epic", "Rare", "Common", "Legendary", "Rare", "Epic" }
+-- Skin id -> model builder.
+local BUILDERS: { [string]: (cf: CFrame, scale: number) -> Model } = {}
 
 ChairSkins.CATALOG = {} :: { Skin }
-for i, rarity in RARITIES do
+for _, skin in Skins.ofKind("Chair") do
 	table.insert(ChairSkins.CATALOG, {
-		id = "skin" .. i,
-		name = "Chair Skin " .. i,
-		rarity = rarity,
-		build = placeholder,
+		id = skin.id,
+		name = skin.name,
+		rarity = skin.rarity,
+		build = BUILDERS[skin.id] or placeholder,
 	})
 end
 

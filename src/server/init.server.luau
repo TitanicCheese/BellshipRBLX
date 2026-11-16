@@ -6,6 +6,7 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ChairShop = require(script.ChairShop)
+local Economy = require(script.Economy)
 local Leaderboards = require(script.Leaderboards)
 local Match = require(script.Match)
 local Stats = require(script.Stats)
@@ -29,6 +30,7 @@ joinEvent.Parent = remotes
 remotes.Parent = ReplicatedStorage
 
 Stats.start()
+Economy.start(remotes)
 local world = World.build()
 Leaderboards.start(world.boards, workspace:FindFirstChild("World") :: Instance)
 local tablesFolder = Instance.new("Folder")
@@ -165,6 +167,10 @@ if RunService:IsStudio() then
 			elseif typeof(a) == "string" and typeof(b) == "number" then
 				Stats.debugSet(player, a, b)
 			end
+			return "ok"
+		elseif command == "cash" then
+			-- ("cash", field, value): set a field of the first player's economy data.
+			Economy.debug(Players:GetPlayers()[1], a, b)
 			return "ok"
 		elseif command == "fake" then
 			-- ("fake", stat, { { userId, value } }): pretend these scores were saved this week.

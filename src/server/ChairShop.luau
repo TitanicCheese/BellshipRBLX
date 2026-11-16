@@ -1,12 +1,15 @@
 -- The chair shop at the front of the island: a wooden arch with a glowing sign and five glowing
 -- pedestals. Every three minutes a new set of five skins is picked from the catalog (the same
--- set on every server, since it is picked from the clock). Equip a skin at its pedestal and your
--- chair turns into it whenever you sit at a table.
+-- set on every server, since it is picked from the clock). Buy a skin with dollars at its
+-- pedestal, then equip it, and your chair turns into it whenever you sit at a table.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ChairSkins = require(script.Parent.ChairSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Economy = require(script.Parent.Economy)
+local Skins = require(ReplicatedStorage.Shared.Skins)
+local RewardsConfig = require(ReplicatedStorage.Shared.RewardsConfig)
 local Stats = require(script.Parent.Stats)
 
 local ChairShop = {}
@@ -218,11 +221,12 @@ local function show(slot: Slot, skin: ChairSkins.Skin?)
 	slot.glow.Color = color
 	slot.light.Color = color
 	slot.name.Text = skin.name
-	slot.rarity.Text = skin.rarity
+	slot.rarity.Text = skin.rarity .. " · " .. RewardsConfig.money(RewardsConfig.SKIN_PRICES[skin.rarity])
 	slot.rarity.TextColor3 = color
 	slot.prompt.ObjectText = skin.name
 	slot.prompt.Enabled = true
 	slot.model:SetAttribute("SkinId", skin.id)
+	slot.model:SetAttribute("Price", RewardsConfig.SKIN_PRICES[skin.rarity])
 	local display = skin.build(slot.top, DISPLAY_SCALE)
 	display.Name = "Display"
 	for _, part in display:GetDescendants() do
@@ -254,17 +258,36 @@ function ChairShop.start(cf: CFrame, parent: Instance, seats: { Seat })
 	end
 	model.Parent = parent
 
-	-- Which seat each player is in, so equipping while seated updates that chair.
+	-- Which seat each player is in, so equipping while seated updates that chair and sheet.
 	local seatOf: { [Player]: Seat } = {}
+	local undoBoard: { [Seat]: () -> () } = {}
 	local function dress(seat: Seat)
 		local chair = seat.Parent
-		if not chair or not chair:IsA("Model") then
+		local tableModel = chair and chair.Parent
+		if not chair or not chair:IsA("Model") or not tableModel or not tableModel:IsA("Model") then
 			return
 		end
 		local humanoid = seat.Occupant
 		local player = humanoid and Players:GetPlayerFromCharacter(humanoid.Parent)
-		ChairSkins.apply(chair, if player then Stats.chairSkin(player) else "", Config.CHAIR_SCALE)
+		local skin = if player then Stats.chairSkin(player) else ""
+		if player and not Economy.owns(player, skin) then
+			skin = ""
+		end
+		ChairSkins.apply(chair, skin, Config.CHAIR_SCALE)
+		-- The sheet on this side gets the sitter's board skin.
+		local undo = undoBoard[seat]
+		if undo then
+			undo()
+		end
+		local side = tonumber(string.match(seat.Name, "%d+")) or 1
+		undoBoard[seat] = Skins.styleBoard(Economy.equippedBoard(player), tableModel, side)
 	end
+	Economy.Equipped:Connect(function(player)
+		local seat = seatOf[player]
+		if seat then
+			dress(seat)
+		end
+	end)
 	for _, seat in seats do
 		local sitter: Player? = nil
 		seat:GetPropertyChangedSignal("Occupant"):Connect(function()
@@ -283,18 +306,18 @@ function ChairShop.start(cf: CFrame, parent: Instance, seats: { Seat })
 		seatOf[player] = nil
 	end)
 
-	-- Equip from a pedestal; equipping the skin you already have takes it off again.
+	-- Buy at a pedestal, then equip; equipping the skin you already have takes it off again.
 	for _, slot in slots do
 		slot.prompt.Triggered:Connect(function(player)
 			local skin = slot.skin
 			if not skin then
 				return
 			end
-			Stats.setChairSkin(player, if Stats.chairSkin(player) == skin.id then "" else skin.id)
-			local seat = seatOf[player]
-			if seat then
-				dress(seat)
+			if not Economy.owns(player, skin.id) then
+				Economy.buy(player, skin)
+				return
 			end
+			Economy.equip(player, skin.id)
 		end)
 	end
 
