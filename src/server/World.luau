@@ -228,33 +228,77 @@ local function tree(pos: Vector3, rng: Random, parent: Instance)
 	model.Parent = parent
 end
 
+-- One puffy cartoon cloud: a row of white ellipsoids, biggest in the middle, with a flat-ish
+-- underside, lying across the direction it is seen from.
+local function cloud(center: Vector3, scale: number, facing: Vector3, rng: Random, parent: Instance)
+	local cf = CFrame.lookAt(center, center + facing)
+	local puffs = rng:NextInteger(4, 7)
+	local width = scale * rng:NextNumber(26, 40)
+	for i = 1, puffs do
+		local f = (i - 1) / (puffs - 1)
+		local bulge = 0.55 + 0.45 * math.sin(f * math.pi)
+		local r = scale * rng:NextNumber(7, 10) * bulge
+		local x = (f - 0.5) * width
+		local blob = part({
+			Size = Vector3.new(r * 2.4, r * 1.8, r * 2),
+			CFrame = cf * CFrame.new(x, r * 0.55, rng:NextNumber(-0.3, 0.3) * r),
+			Color = Color3.fromRGB(255, 255, 255),
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CastShadow = false,
+		}, parent)
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = blob
+	end
+	-- A wide, flat, slightly blue base so each cloud has a cartoon shaded bottom.
+	local base = part({
+		Size = Vector3.new(width + scale * 14, scale * 5, scale * 16),
+		CFrame = cf,
+		Color = Color3.fromRGB(222, 238, 255),
+		Material = Enum.Material.SmoothPlastic,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	}, parent)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = base
+end
+
+-- Rings of clouds all the way around the island at several distances, so they drift past each
+-- other as you move, and a sea of clouds far below.
 local function clouds(parent: Instance, rng: Random)
 	local folder = Instance.new("Folder")
 	folder.Name = "Clouds"
 	folder.Parent = parent
-	for _ = 1, 34 do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(160, 300)
-		local center = Vector3.new(
-			math.cos(angle) * radius,
-			TOP + rng:NextNumber(-90, 25),
-			CENTER_Z + math.sin(angle) * radius * 0.8
-		)
-		for _ = 1, rng:NextInteger(3, 6) do
-			part({
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * rng:NextNumber(10, 24),
-				Position = center
-					+ Vector3.new(rng:NextNumber(-14, 14), rng:NextNumber(-3, 4), rng:NextNumber(-10, 10)),
-				Color = Color3.fromRGB(255, 255, 255),
-				Material = Enum.Material.SmoothPlastic,
-				Transparency = 0.08,
-				CanCollide = false,
-				CanQuery = false,
-				CanTouch = false,
-				CastShadow = false,
-			}, folder)
+	local middle = Vector3.new(0, TOP, CENTER_Z)
+	local rings = {
+		-- count, min radius, max radius, min height, max height, min scale, max scale
+		{ 16, 175, 240, -35, 30, 0.7, 1.1 },
+		{ 22, 330, 460, -50, 70, 1.6, 2.4 },
+		{ 28, 650, 850, -90, 60, 3.2, 4.6 },
+	}
+	for _, ring in rings do
+		local count = ring[1]
+		for i = 1, count do
+			local angle = (i + rng:NextNumber(-0.35, 0.35)) / count * math.pi * 2
+			local radius = rng:NextNumber(ring[2], ring[3])
+			local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local center = middle + out * radius + Vector3.new(0, rng:NextNumber(ring[4], ring[5]), 0)
+			cloud(center, rng:NextNumber(ring[6], ring[7]), -out, rng, folder)
 		end
+	end
+	-- The cloud sea under the island.
+	for _ = 1, 40 do
+		local angle = rng:NextNumber(0, math.pi * 2)
+		local radius = math.sqrt(rng:NextNumber(0, 1)) * 750
+		local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local center = middle + out * radius + Vector3.new(0, rng:NextNumber(-190, -160), 0)
+		cloud(center, rng:NextNumber(3, 5), Vector3.new(-out.Z, 0, out.X), rng, folder)
 	end
 end
 
@@ -283,14 +327,12 @@ local function lighting()
 	color.Saturation = 0.12
 	color.Contrast = 0.05
 	color.Parent = Lighting
-	-- A cartoon skybox: a flat blue gradient with outlined puffy clouds (drawn by tools/sky).
+	-- A cartoon skybox: a smooth blue gradient (drawn by tools/sky/gen.py); the clouds are parts.
 	local sky = Instance.new("Sky")
-	sky.SkyboxBk = "rbxassetid://73700876269543"
-	sky.SkyboxDn = "rbxassetid://89941321717010"
-	sky.SkyboxFt = "rbxassetid://140065508811232"
-	sky.SkyboxLf = "rbxassetid://108708506819179"
-	sky.SkyboxRt = "rbxassetid://95588403178691"
+	local side = "rbxassetid://110171074745610"
+	sky.SkyboxBk, sky.SkyboxFt, sky.SkyboxLf, sky.SkyboxRt = side, side, side, side
 	sky.SkyboxUp = "rbxassetid://117585785896620"
+	sky.SkyboxDn = "rbxassetid://89941321717010"
 	sky.StarCount = 0
 	sky.SunAngularSize = 14
 	sky.MoonAngularSize = 0
