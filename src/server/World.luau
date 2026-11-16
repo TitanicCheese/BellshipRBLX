@@ -13,8 +13,6 @@ local World = {}
 World.TOP = 100 -- height of the island's grass surface
 local TOP = World.TOP
 
-local UPRIGHT = CFrame.Angles(0, 0, math.pi / 2)
-
 local function part(props: { [string]: any }, parent: Instance): Part
 	local p = Instance.new("Part")
 	p.Anchored = true
@@ -112,26 +110,120 @@ local function spawnStrip(parent: Instance): CFrame
 	return spawn.CFrame
 end
 
+-- Voxel trees: stepped roots, a square trunk that forks into branches, and tilted leaf blocks
+-- covered in smaller cubes, with dark cubes underneath and light ones catching the sun on top.
+local BARK = Color3.fromRGB(104, 72, 48)
+local BARK_DARK = Color3.fromRGB(82, 56, 38)
+local LEAF = Color3.fromRGB(86, 162, 72)
+local LEAF_DARK = Color3.fromRGB(64, 130, 58)
+local LEAF_LIGHT = Color3.fromRGB(118, 192, 86)
+local LEAF_SHINE = Color3.fromRGB(168, 222, 112)
+
+local function block(size: Vector3, cf: CFrame, color: Color3, parent: Instance): Part
+	return part({ Size = size, CFrame = cf, Color = color, Material = Enum.Material.SmoothPlastic }, parent)
+end
+
+-- A square beam of the given thickness from a to b.
+local function beam(a: Vector3, b: Vector3, thickness: number, color: Color3, parent: Instance)
+	local length = (b - a).Magnitude
+	block(Vector3.new(thickness, thickness, length + thickness * 0.6), CFrame.lookAt((a + b) / 2, b), color, parent)
+end
+
+local function leaves(center: Vector3, size: number, rng: Random, parent: Instance)
+	local cf = CFrame.new(center)
+		* CFrame.Angles(rng:NextNumber(-0.25, 0.25), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.25, 0.25))
+	local main = Vector3.new(size, size * 0.72, size * rng:NextNumber(0.8, 1))
+	block(main, cf, LEAF, parent)
+	-- A darker block underneath so the canopy has a shaded bottom.
+	block(main * Vector3.new(0.86, 0.3, 0.86), cf * CFrame.new(0, -main.Y / 2, 0), LEAF_DARK, parent)
+
+	-- Chunks sticking out of the sides and top.
+	local function onSurface(inset: number, top: boolean?): CFrame
+		local face = if top then 2 else rng:NextInteger(1, 3)
+		local sign = if top then 1 else (if rng:NextNumber() < 0.5 then 1 else -1)
+		local offset = Vector3.new(
+			rng:NextNumber(-0.45, 0.45) * main.X,
+			rng:NextNumber(-0.3, 0.45) * main.Y,
+			rng:NextNumber(-0.45, 0.45) * main.Z
+		)
+		local half = main / 2 - Vector3.one * inset
+		if face == 1 then
+			offset = Vector3.new(sign * half.X, offset.Y, offset.Z)
+		elseif face == 2 then
+			offset = Vector3.new(offset.X, sign * half.Y, offset.Z)
+		else
+			offset = Vector3.new(offset.X, offset.Y, sign * half.Z)
+		end
+		return cf * CFrame.new(offset)
+	end
+	for _ = 1, rng:NextInteger(4, 6) do
+		local s = size * rng:NextNumber(0.28, 0.45)
+		local shade = if rng:NextNumber() < 0.4 then LEAF_LIGHT else LEAF
+		block(Vector3.new(s, s * 0.8, s), onSurface(s * 0.2), shade, parent)
+	end
+	for _ = 1, rng:NextInteger(2, 3) do
+		local s = size * rng:NextNumber(0.25, 0.35)
+		block(Vector3.new(s, s * 0.6, s), onSurface(s * 0.15, true), LEAF_LIGHT, parent)
+	end
+	-- Small bright cubes catching the light, and a few dark ones hanging below.
+	for _ = 1, rng:NextInteger(7, 11) do
+		local s = rng:NextNumber(0.7, 1.3)
+		local p = block(Vector3.one * s, onSurface(s * 0.1, rng:NextNumber() < 0.5), LEAF_SHINE, parent)
+		p.CanCollide = false
+	end
+	for _ = 1, rng:NextInteger(2, 4) do
+		local s = rng:NextNumber(0.8, 1.4)
+		local p = block(
+			Vector3.one * s,
+			cf
+				* CFrame.new(
+					rng:NextNumber(-0.4, 0.4) * main.X,
+					-main.Y / 2 - s * 0.2,
+					rng:NextNumber(-0.4, 0.4) * main.Z
+				),
+			LEAF_DARK,
+			parent
+		)
+		p.CanCollide = false
+	end
+end
+
 local function tree(pos: Vector3, rng: Random, parent: Instance)
 	local model = Instance.new("Model")
 	model.Name = "Tree"
-	local height = rng:NextNumber(9, 14)
-	part({
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(height, 1.8, 1.8),
-		CFrame = CFrame.new(pos + Vector3.new(0, height / 2, 0)) * UPRIGHT,
-		Color = Color3.fromRGB(110, 76, 50),
-		Material = Enum.Material.Wood,
-	}, model)
-	for _ = 1, 3 do
-		local size = rng:NextNumber(6, 9)
-		part({
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.one * size,
-			Position = pos + Vector3.new(rng:NextNumber(-2, 2), height + rng:NextNumber(-1, 2), rng:NextNumber(-2, 2)),
-			Color = Color3.fromRGB(80 + rng:NextInteger(0, 20), 150 + rng:NextInteger(0, 25), 70),
-			Material = Enum.Material.Grass,
-		}, model)
+	local yaw = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+
+	-- Stepped roots around a wide base.
+	block(Vector3.new(2.6, 1.2, 2.6), CFrame.new(pos + Vector3.new(0, 0.6, 0)) * yaw, BARK_DARK, model)
+	for i = 0, 3 do
+		local dir = (yaw * CFrame.Angles(0, i * math.pi / 2 + rng:NextNumber(-0.3, 0.3), 0)).LookVector
+		local reach = rng:NextNumber(1.6, 2.4)
+		block(
+			Vector3.new(1, rng:NextNumber(0.5, 0.9), reach),
+			CFrame.lookAt(
+				pos + dir * (reach / 2 + 0.6) + Vector3.new(0, 0.35, 0),
+				pos + dir * 5 + Vector3.new(0, 0.35, 0)
+			),
+			BARK_DARK,
+			model
+		)
+	end
+
+	-- Trunk up to the fork, leaning slightly.
+	local forkHeight = rng:NextNumber(5.5, 7.5)
+	local lean = Vector3.new(rng:NextNumber(-0.8, 0.8), 0, rng:NextNumber(-0.8, 0.8))
+	local fork = pos + Vector3.new(0, forkHeight, 0) + lean
+	beam(pos + Vector3.new(0, 1, 0), fork, 1.6, BARK, model)
+
+	-- Two or three branches, each ending in a leaf cluster.
+	local branches = rng:NextInteger(2, 3)
+	local start = rng:NextNumber(0, math.pi * 2)
+	for i = 1, branches do
+		local angle = start + (i - 1) * (math.pi * 2 / branches) + rng:NextNumber(-0.4, 0.4)
+		local out = rng:NextNumber(2.5, 4)
+		local tip = fork + Vector3.new(math.cos(angle) * out, rng:NextNumber(3.5, 5.5), math.sin(angle) * out)
+		beam(fork, tip, rng:NextNumber(0.9, 1.2), BARK, model)
+		leaves(tip + Vector3.new(0, 1.5, 0), rng:NextNumber(5.5, 7.5), rng, model)
 	end
 	model.Parent = parent
 end
@@ -173,13 +265,14 @@ local function lighting()
 	Lighting.OutdoorAmbient = Color3.fromRGB(152, 150, 148)
 	Lighting.EnvironmentDiffuseScale = 0.6
 	Lighting.EnvironmentSpecularScale = 0.15
+	-- Light atmosphere tinted to the sky's horizon colour, so distant things fade into it.
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.3
-	atmosphere.Offset = 0.12
-	atmosphere.Color = Color3.fromRGB(205, 228, 255)
-	atmosphere.Decay = Color3.fromRGB(130, 170, 220)
-	atmosphere.Glare = 0.25
-	atmosphere.Haze = 1.3
+	atmosphere.Density = 0.22
+	atmosphere.Offset = 0.1
+	atmosphere.Color = Color3.fromRGB(196, 238, 255)
+	atmosphere.Decay = Color3.fromRGB(120, 196, 250)
+	atmosphere.Glare = 0
+	atmosphere.Haze = 0.4
 	atmosphere.Parent = Lighting
 	local bloom = Instance.new("BloomEffect")
 	bloom.Intensity = 0.5
@@ -190,7 +283,18 @@ local function lighting()
 	color.Saturation = 0.12
 	color.Contrast = 0.05
 	color.Parent = Lighting
-	Instance.new("Sky").Parent = Lighting
+	-- A cartoon skybox: a flat blue gradient with outlined puffy clouds (drawn by tools/sky).
+	local sky = Instance.new("Sky")
+	sky.SkyboxBk = "rbxassetid://73700876269543"
+	sky.SkyboxDn = "rbxassetid://89941321717010"
+	sky.SkyboxFt = "rbxassetid://140065508811232"
+	sky.SkyboxLf = "rbxassetid://108708506819179"
+	sky.SkyboxRt = "rbxassetid://95588403178691"
+	sky.SkyboxUp = "rbxassetid://117585785896620"
+	sky.StarCount = 0
+	sky.SunAngularSize = 14
+	sky.MoonAngularSize = 0
+	sky.Parent = Lighting
 end
 
 export type WorldInfo = { spawn: CFrame, tables: { CFrame }, boards: { CFrame } }
